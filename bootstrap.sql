@@ -19,13 +19,13 @@ CREATE DATABASE IF NOT EXISTS FISERV_SETUP;
 -- outside it is reachable through this integration.
 CREATE OR REPLACE API INTEGRATION snowcamp_git_api
   API_PROVIDER = git_https_api
-  API_ALLOWED_PREFIXES = ('https://github.com/sfc-gh-amacdonald')
+  API_ALLOWED_PREFIXES = ('https://github.com/alexmacdonald003')
   ENABLED = TRUE;
 
 -- The repository clone. No GIT_CREDENTIALS: the repo is public.
 CREATE OR REPLACE GIT REPOSITORY FISERV_SETUP.PUBLIC.WORKSHOP
   API_INTEGRATION = snowcamp_git_api
-  ORIGIN = 'https://github.com/sfc-gh-amacdonald/snowflake-snowcamp-dublin.git';
+  ORIGIN = 'https://github.com/alexmacdonald003/snowflake-snowcamp-dublin.git';
 
 -- Pull the files. Re-run this line any time to pick up corrections made during the day.
 ALTER GIT REPOSITORY FISERV_SETUP.PUBLIC.WORKSHOP FETCH;
