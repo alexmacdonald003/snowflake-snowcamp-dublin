@@ -1,0 +1,12 @@
+# Profile for dbt Projects on Snowflake, running inside a Snowsight Workspace.
+# The Workspace supplies the connection, so no account, user or password here.
+fiserv_payments:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      database: FISERV_PAYMENTS_DB
+      schema: DBT_STAGING
+      warehouse: FISERV_WH
+      role: ACCOUNTADMIN
+      threads: 4

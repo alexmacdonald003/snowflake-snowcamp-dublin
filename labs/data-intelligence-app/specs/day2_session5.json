@@ -1,0 +1,148 @@
+{
+  "cells": [
+    {
+      "type": "markdown",
+      "source": "# Session 5 — Agents, Governance and Evaluation\n\n**Building an End-to-End Application Using CoCo on Snowflake**\n*Fiserv Snowcamp, Dublin, 3 September 2026*"
+    },
+    {
+      "type": "markdown",
+      "source": "> **How to use this notebook.** Every step gives you two paths that reach the same result.\n>\n> **Prompt CoCo** - open the **Cortex Code** panel in this workspace and type the quoted text. CoCo writes the SQL, runs it, and shows the result. Read what it proposes before you accept it: deciding whether the answer is right is the skill this session teaches.\n>\n> **Run the SQL cell** - the cell underneath does the same job directly. Use it if you want precise control, or to catch up if you fall behind.\n>\n> Work through the cells in order."
+    },
+    {
+      "type": "markdown",
+      "source": "## Overview\n\nSession 4 built a trustworthy pipeline. This session puts a Cortex Agent on top of it and\nasks the harder question: how do you know the answers are right?\n\nYou will create an agent that orchestrates Cortex Analyst over a semantic view and Cortex\nSearch over free text, talk to it in Snowflake CoWork, run a Deep Research investigation,\nsee how a row access policy governs it without any change to the agent, ship it as a\nStreamlit app, and then evaluate it against ground truth you derive by querying rather\nthan by assuming.\n\n### What You'll Learn\n\n- Build a Cortex Agent with Cortex Analyst (semantic view plus verified queries) and Cortex Search\n- Write response instructions that stop the agent making three specific, expensive mistakes\n- Use Snowflake CoWork for conversational analysis, Deep Research, Artifacts and Automations\n- Implement transparent row-level security with Row Access Policies, and see the agent inherit it\n- Ship the agent as a Streamlit app that inherits the same governance\n- Evaluate agent quality with ground-truth datasets and LLM judges\n- Read agent observability traces: reasoning steps, tool calls and token usage\n\n### What You'll Build\n\nA governed conversational interface over the payments platform from session 4, evaluated\nagainst query-derived ground truth, exposed as an app, and observable in production.\n\n### Prerequisites\n\n- Session 4 completed. This session builds directly on it.\n- A browser and your Snowflake account details.\n\n### Table of Contents\n\n1. Snowflake CoWork\n2. Security and Governance\n3. Streamlit Dashboard\n4. Agent Evaluation\n5. Agent Observability\n6. Optional: MCP Server\n7. Optional: Streaming Ingestion\n8. Cleanup and Troubleshooting"
+    },
+    {
+      "type": "markdown",
+      "source": "## Snowflake CoWork\n\n**Cortex Agents** are multi-tool AI orchestrators that route questions to the right data\nsource. They combine **Cortex Analyst** (text-to-SQL over Semantic Views) with **Cortex\nSearch** (vector plus keyword search over unstructured data) to answer both \"what happened\"\nand \"why\" from a single conversational interface.\n\nYour agent will have three tools: the semantic view, and one search service each over\nmerchant feedback and support cases.\n\n### What the Semantic Layer Gives You\n\n**Prompt CoCo:**\n\n> What is in FISERV_PAYMENTS_DB.SEMANTIC? Explain what the semantic view gives me that querying the raw tables does not, and what the two Cortex Search services are for."
+    },
+    {
+      "type": "sql",
+      "name": "snowflake_cowork",
+      "source": "-- Pins role, database, schema and warehouse for every cell below. Re-run this if a\n-- later cell cannot find an object.\nUSE ROLE ACCOUNTADMIN;\nUSE DATABASE FISERV_PAYMENTS_DB;\nUSE SCHEMA SEMANTIC;\nUSE WAREHOUSE FISERV_WH;"
+    },
+    {
+      "type": "sql",
+      "name": "snowflake_cowork_2",
+      "source": "-- The semantic layer the agent will reason over.\nSHOW SEMANTIC VIEWS IN SCHEMA FISERV_PAYMENTS_DB.SEMANTIC;"
+    },
+    {
+      "type": "sql",
+      "name": "snowflake_cowork_3",
+      "source": "-- The two free-text indexes: merchant sentiment and support incidents.\nSHOW CORTEX SEARCH SERVICES IN SCHEMA FISERV_PAYMENTS_DB.SEMANTIC;"
+    },
+    {
+      "type": "markdown",
+      "source": "A **semantic view** defines your metrics and joins once, so every agent and BI tool\nresolves against the same definitions. Ours carries five **verified queries**: known-good\nquestion and SQL pairs the agent can lean on rather than improvising.\n\n### Create the Agent\n\n**Prompt CoCo:**\n\n> Create a Cortex Agent called FISERV_PAYMENTS_AGENT with three tools: the PAYMENTS_ANALYTICS semantic view for anything countable, and the two search services for merchant sentiment and support incidents. Give each tool a description that makes it obvious to the orchestrator when to use it rather than the others.\n\n### The Part That Matters\n\n**Prompt CoCo:**\n\n> Now write the response instructions. This agent must not confuse total fees with net fee revenue, must use authorisation attempts as the denominator for approval rate, and must exclude declined transactions from processed volume. Be explicit, because these are the three mistakes it will otherwise make.\n\nWithout that instruction the agent reports the €3.2M of total fees as revenue instead of\nthe €1.9M actually retained, an overstatement of about 66 percent. **The instructions are\nnot decoration. They are the difference between a demo and a liability.**\n\n**Prompt CoCo:**\n\n> Ask the agent what our net fee revenue was for the whole period."
+    },
+    {
+      "type": "sql",
+      "name": "snowflake_cowork_4",
+      "source": "-- The answer key. Derive it, do not assume it.\nSELECT ROUND(SUM(CASE WHEN FEE_CATEGORY = 'Pass-through' THEN 0\n                      ELSE FEE_AMOUNT_EUR END), 2) AS NET_FEE_REVENUE_EUR,\n       ROUND(SUM(FEE_AMOUNT_EUR), 2)               AS TOTAL_FEES_EUR\nFROM FISERV_PAYMENTS_DB.RAW.FEE_LINES;"
+    },
+    {
+      "type": "markdown",
+      "source": "Correct answer: **€1,934,149.64**. If you get €3,203,738.89, your instructions did not\nland. Go back and make them explicit.\n\n### Test Agent Routing\n\n**Prompt CoCo:**\n\n> Ask the agent which month had the lowest approval rate and what it was.\n\n**August 2025 at 88.02 percent**, against roughly 93.98 to 93.99 percent in the other\nthree months.\n\nNow the capstone question:\n\n> Approval rates dipped in August. What happened, and does the merchant-facing evidence agree?\n\nWatch which tools it reaches for. A good answer quantifies the dip from the semantic view,\nfinds that **Issuer Unavailable rose to 38.1 percent of declines from a baseline of 5.0\npercent**, and then corroborates it from support cases and merchant feedback written in\nAugust. The numbers and the narrative agree, and the cause turns out to be upstream of\nFiserv: not a terminal fault and not the gateway.\n\nThen ask something it should refuse:\n\n> What will our approval rate be next March?\n\nThe data ends September 2025. A good agent says so. A bad one extrapolates confidently.\n\n### Open It in CoWork\n\nOpen the agent in **Snowflake CoWork** and ask the August question again. Watch the tool\nrouting in the trace. You are looking for *which* tool fired and *why*, not just the\nanswer.\n\n### Deep Research\n\n> **Not yet verified.** Deep Research is a CoWork interface feature with no SQL surface, so\n> it could not be tested before the workshop. If it behaves differently from what follows,\n> tell your facilitator: that is useful information, not a failure on your part.\n\n**Deep Research** runs a multi-step investigation rather than answering in one shot. It\nplans, gathers from several sources, and returns a report with citations.\n\nIn CoWork, start a Deep Research investigation with:\n\n> Investigate the August 2025 approval rate dip end to end. Quantify it, identify the dominant decline reason and how far it moved from baseline, check whether merchant feedback and support cases from August corroborate it, and tell me whether the cause is inside or outside Fiserv's control.\n\nExpect it to take noticeably longer than a normal question and to cite both the structured\nfigures and specific pieces of free text. Compare its answer to the one you got from the\nsingle capstone question above: the interesting part is whether the extra steps changed the\nconclusion or only the amount of supporting evidence.\n\n### Save as Artifact\n\n> **Not yet verified.** As above.\n\nSave the Deep Research result as an **Artifact**, which makes it a governed object others\ncan open rather than a message in your chat history.\n\nThen establish what governance travelled with it:\n\n> Who can see this artifact, and does the row access policy on RAW.MERCHANTS still apply to whoever opens it?\n\nThat question matters more than the saving. An artifact that captured\n`ACCOUNTADMIN`-visible numbers and is then shared with a regional role would be a\ngovernance hole, and you want to know which way it works before you rely on it.\n\n### Set Up an Automation\n\n> **Not yet verified.** As above.\n\nAn **Automation** runs an agent request on a schedule, so an investigation becomes a\nrecurring report.\n\nCreate one that runs the approval-rate check weekly:\n\n> Every Monday at 08:00, report processed volume, approval rate and net fee revenue for the previous week, and flag any decline reason that has moved more than five percentage points from its four-week average.\n\nThe flag threshold is the point. A scheduled report nobody reads is worse than no report;\na scheduled report that only speaks up when something moved is a control."
+    },
+    {
+      "type": "markdown",
+      "source": "## Security and Governance\n\n**Row Access Policies** enforce row-level security declaratively. You define a boolean\nexpression that determines which rows are visible to which roles, and Snowflake applies it\ntransparently to every query, including those generated by AI agents. No application code\nchanges required.\n\nBecause the policy is attached to the table, everything reading that table inherits it: SQL\nyou write by hand, the agent, and any app built on top.\n\nOne interaction worth knowing, since this workshop uses both features: a row access policy\nthat calls context functions can block **incremental** refresh on a dynamic table built over\nthat table. Ours does not, which is why all five dynamic tables are still incremental, but it\nis the first thing to check if a pipeline silently downgrades to full refresh.\n\n**Prompt CoCo:**\n\n> There is a row access policy on RAW.MERCHANTS. Explain what it does and how it decides what a caller can see."
+    },
+    {
+      "type": "sql",
+      "name": "security_and_governance",
+      "source": "-- Where the policy is attached. POLICY_REFERENCES is a table function, not a view.\nSELECT POLICY_NAME, REF_ENTITY_NAME, REF_COLUMN_NAME, POLICY_STATUS\nFROM TABLE(FISERV_PAYMENTS_DB.INFORMATION_SCHEMA.POLICY_REFERENCES(\n    POLICY_NAME => 'FISERV_PAYMENTS_DB.SEMANTIC.ACQUIRING_REGION_POLICY'));"
+    },
+    {
+      "type": "markdown",
+      "source": "It keys on `CURRENT_ROLE()`. `ACCOUNTADMIN` and `SYSADMIN` see everything;\n`SOUTHERN_EUROPE_MANAGER` sees Southern Europe only.\n\n**Prompt CoCo:**\n\n> Show me merchant counts by acquiring region as my current role, then explain what the same query would return as SOUTHERN_EUROPE_MANAGER."
+    },
+    {
+      "type": "sql",
+      "name": "security_and_governance_2",
+      "source": "-- Run this as your own role now, and note the numbers. The facilitator will run the\n-- identical query as SOUTHERN_EUROPE_MANAGER and get a different answer.\nSELECT ACQUIRING_REGION, COUNT(*) AS MERCHANTS\nFROM FISERV_PAYMENTS_DB.RAW.MERCHANTS\nGROUP BY ACQUIRING_REGION\nORDER BY MERCHANTS DESC;"
+    },
+    {
+      "type": "markdown",
+      "source": "Four regions and 2,000,000 merchants as `ACCOUNTADMIN`. **699,882 and one region** as the\nregional role.\n\n### Verify Through CoWork\n\n**Facilitator demo.** Your facilitator will sign in as a second user holding\n`SOUTHERN_EUROPE_MANAGER` and ask the agent the same August question you asked earlier.\nSame agent, same question, different answer, because the policy applies to the SQL the\nagent *generates*, not only to SQL you write yourself.\n\n**Prompt CoCo:**\n\n> If the policy filters what the agent can see, what does that mean for evaluating the agent?\n\nThis matters for the next step. Evaluations do not pass session attributes, so an agent\nwhose results depend on them cannot be evaluated meaningfully. Ours keys on\n`CURRENT_ROLE()` and the evaluation runs as your role, which is why it works here. A policy\nbuilt on session variables would quietly break it."
+    },
+    {
+      "type": "markdown",
+      "source": "## Streamlit Dashboard\n\n**Streamlit in Snowflake** lets you build and deploy interactive data applications directly\nwithin your Snowflake account, with no external infrastructure. Apps run securely inside\nSnowflake with native access to your data, governed by role-based access control.\n\nExactly *whose* role governs them is the question this section ends on, and it is not the one\nmost people expect.\n\n**Prompt CoCo:**\n\n> Build me a Streamlit app in this workspace with two tabs. First tab: a dashboard of processed volume and approval rate by month and region, from the semantic view. Second tab: a chat box that talks to FISERV_PAYMENTS_AGENT.\n\n> Make the August dip obvious on the dashboard without me having to hunt for it.\n\n> Run it and fix anything that breaks.\n\n> Who can see what in this app if I share it with a colleague who only holds SOUTHERN_EUROPE_MANAGER?\n\n**Do not take CoCo's answer on trust. Test it.** Share the app with your second login, open\nit as `SOUTHERN_EUROPE_MANAGER`, and read the merchant count off the dashboard."
+    },
+    {
+      "type": "sql",
+      "name": "streamlit_dashboard",
+      "source": "-- What the app SHOULD show a regional colleague, if the policy followed them.\nUSE ROLE SOUTHERN_EUROPE_MANAGER;\nSELECT COUNT(*) AS MERCHANTS_VISIBLE FROM FISERV_PAYMENTS_DB.RAW.MERCHANTS;\nUSE ROLE ACCOUNTADMIN;"
+    },
+    {
+      "type": "markdown",
+      "source": "Run as the regional role directly, that returns **699,882**. Now compare it against what the\nshared app displays.\n\n**They will not match.** The app shows all **2,000,000** merchants.\n\nStreamlit in Snowflake runs with the **owner's rights** by default, not the viewer's. The\nquery inside the app executes as you, the owner, so the row access policy is evaluated\nagainst `ACCOUNTADMIN` regardless of who is looking at the screen. Your colleague sees\neverything.\n\n> I expected the row access policy to apply to whoever opens the app, but it is showing all 2,000,000 merchants. Explain why, and what I would have to change.\n\nThe fix is **Restricted Caller's Rights**, which makes the app execute with the caller's role\nso policies evaluate against the person viewing. It is deliberately not the default.\n\n**What to take away:** governance defined once at the table did follow the pipeline and the\nagent, and it is genuinely worth having. But it stopped at the app boundary, and nothing\nwarned you. \"The policy applies everywhere\" was a reasonable assumption that happened to be\nwrong, and the only way you found out was by checking a number."
+    },
+    {
+      "type": "markdown",
+      "source": "## Agent Evaluation\n\n**Agent evaluation** scores an agent's answers against ground truth you supply, and reports\nper-metric results you can act on. The metric to understand before you start is **tool\nselection accuracy**: it divides by `max(expected, actual)`, so calling an *extra* tool is\npenalised exactly as hard as missing a required one.\n\nThat matters because a red metric is a **question, not a verdict**. More often than not the\nanswer key is wrong, not the agent. You are about to find two of yours are.\n\nOne limitation to know: evaluations do not pass session attributes, so the row access policy\nfrom the previous section does not apply during a run. Evaluate as the owner, not as a\nregional role.\n\nThe agent gives confident answers. That is not evidence that they are right.\n\n**Prompt CoCo:**\n\n> I want to evaluate this agent properly. Build me an evaluation set of seven questions covering monthly approval rate, net fee revenue, low-rated feedback about settlement delays, volume by region, August decline reasons, volume by merchant segment, and the August investigation.\n\n### The Discipline\n\n**Prompt CoCo:**\n\n> For each question, derive the expected answer by running a query against the data. Do not write the expected answer from what you assume is true.\n\nTake this seriously. Building this set, **two answer keys turned out to be wrong**:"
+    },
+    {
+      "type": "sql",
+      "name": "agent_evaluation",
+      "source": "-- Largest segment by volume. The intuitive answer is Enterprise. It is not.\nSELECT m.MERCHANT_SEGMENT,\n       ROUND(SUM(a.AUTH_AMOUNT) / 1000000, 1) AS VOLUME_EUR_M\nFROM FISERV_PAYMENTS_DB.RAW.AUTHORISATIONS a\nJOIN FISERV_PAYMENTS_DB.RAW.MERCHANTS m\n  ON a.MERCHANT_ID = m.MERCHANT_ID\nWHERE a.AUTH_RESULT = 'Approved'\nGROUP BY m.MERCHANT_SEGMENT\nORDER BY VOLUME_EUR_M DESC;"
+    },
+    {
+      "type": "markdown",
+      "source": "The largest segment is **SMB at €216.5M**, not Enterprise. Enterprise is the most\n*concentrated* per merchant, which is a different claim. An evaluation asserting the wrong\none would have failed a correct agent.\n\n### Run via Snowsight UI\n\nGo to **AI & ML → Agents**, select `FISERV_PAYMENTS_AGENT`, open the **Evaluations** tab,\nand create a run with answer correctness, logical consistency and tool selection accuracy.\n\nOr run it with SQL:"
+    },
+    {
+      "type": "sql",
+      "name": "agent_evaluation_2",
+      "source": "-- Start the evaluation run. This takes a few minutes: the agent answers every question\n-- and LLM judges then score each answer.\nCALL EXECUTE_AI_EVALUATION(\n  'START',\n  OBJECT_CONSTRUCT('run_name', 'workshop-run-1'),\n  '@FISERV_PAYMENTS_DB.SEMANTIC.EVAL_CONFIG/agent_evaluation_config.yaml'\n);"
+    },
+    {
+      "type": "sql",
+      "name": "agent_evaluation_3",
+      "source": "-- Per-question scores once the run completes.\nSELECT INPUT, METRIC_NAME, EVAL_AGG_SCORE\nFROM TABLE(SNOWFLAKE.LOCAL.GET_AI_EVALUATION_DATA(\n    'FISERV_PAYMENTS_DB', 'SEMANTIC', 'FISERV_PAYMENTS_AGENT',\n    'CORTEX AGENT', 'workshop-run-1'))\nORDER BY INPUT, METRIC_NAME;"
+    },
+    {
+      "type": "markdown",
+      "source": "### Interpret Results\n\n**Prompt CoCo:**\n\n> Tool selection accuracy scored badly on the August investigation question. Is the agent wrong, or is my evaluation wrong?\n\nThe evaluation is wrong. Tool selection accuracy scores matched tools over\n`max(expected, actual)`, so **extra tool calls are penalised**. An open investigative\nquestion legitimately makes five to ten calls, and a fixed expected-tool list cannot match\nthem. The same question scores 1.0 on answer correctness. Judge narrow questions on tool\nselection and investigative ones on correctness and consistency.\n\n**Do not pad the expected-tool list to lift the score.** That teaches you to game the\nmetric.\n\n**Prompt CoCo:**\n\n> One of my questions scored 0.67 on answer correctness even though the agent's numbers look right to me. Check whether my ground truth demanded something the question never asked for.\n\nOver-specified ground truth manufactures false failures. This exact thing happened: the\nanswer key demanded merchant counts for a question that only asked which segment was\nlargest.\n\n### Improve Scores\n\n**Prompt CoCo:**\n\n> Improve the agent based on what the evaluation found, then re-run and compare the two runs.\n\n**What to take away:** an evaluation is a test suite for an agent, and like any test suite\nit can be wrong in ways that look like the code is wrong. A red metric is a question, not\na verdict."
+    },
+    {
+      "type": "markdown",
+      "source": "## Agent Observability\n\n**Agent observability** records what an agent actually did: the tools it chose, the inputs it\npassed them, how long each step took, and how many tokens it burned. Where evaluation asks\n*was the answer right*, observability asks *how was it produced*. Traces are organised as\nthread, turn, trace and span, so you can open a single conversation and walk down into an\nindividual tool call.\n\nTwo things determine what you see. **Evaluation runs do not populate it** — only real\nconversations do. And depth is gated by the `READ UNREDACTED AI OBSERVABILITY EVENTS TABLE`\naccount privilege: without it you get tool names, latency and token counts, but not tool\ninputs or conversation text.\n\n> **Partly verified.** The SQL below runs correctly, but it returned **zero rows** when\n> tested, because the agent had only ever been evaluated. Evaluation traces go to a\n> separate path. Production observability populates only from real conversations, which is\n> why this step comes after you have used CoWork.\n\nWhere evaluation scores an agent on a dataset, **observability** shows you what actually\nhappened in real conversations: planning, tool calls, latency, token usage and user\nfeedback.\n\n**Prompt CoCo:**\n\n> Show me the observability events for FISERV_PAYMENTS_AGENT from the conversations we have had today."
+    },
+    {
+      "type": "sql",
+      "name": "agent_observability",
+      "source": "-- Production conversation traces. Expect ZERO rows until you have actually talked to\n-- the agent in CoWork: evaluation runs write to a different path entirely.\nSELECT TIMESTAMP,\n       RECORD:name::VARCHAR      AS EVENT_NAME,\n       TRACE:trace_id::VARCHAR   AS TRACE_ID\nFROM TABLE(SNOWFLAKE.LOCAL.GET_AI_OBSERVABILITY_EVENTS(\n    'FISERV_PAYMENTS_DB', 'SEMANTIC', 'FISERV_PAYMENTS_AGENT', 'CORTEX AGENT'))\nORDER BY TIMESTAMP DESC\nLIMIT 50;"
+    },
+    {
+      "type": "markdown",
+      "source": "### View Reasoning Steps and Token Usage\n\nIn Snowsight, go to **AI & ML → Agents**, select the agent, and open the **Observability**\ntab. Each row is a conversation thread. Open one and you get a trace per turn, with a span\nfor planning, a span per tool call, and a span for response generation.\n\nOne conversation is a **thread**. One question and its answer is a **turn**, which is one\n**trace**. Each step inside it is a **span**.\n\n### View Tool Calls\n\n**Prompt CoCo:**\n\n> For the August investigation question, show me every tool the agent called and how many tokens each step used.\n\n**A privilege you may hit.** An account-level privilege,\n`READ UNREDACTED AI OBSERVABILITY EVENTS TABLE`, controls whether you can see full tool\ninputs and outputs and full conversation text. Without it you still get metadata: tool\nnames, token usage, latency and errors. If the traces look thinner than expected, that is\nwhy, and it is a deliberate default rather than a fault."
+    },
+    {
+      "type": "markdown",
+      "source": "## Optional: MCP Server\n\n**Facilitator demo, if time allows.** An **MCP server** exposes your agent over an open\nprotocol so any AI client can call it: the same agent, the same governance, a different\nfront door.\n\nOne constraint worth naming, because it rules out combining this with the previous section:\n**evaluations do not support MCP servers as tools.** You can evaluate the agent, and you can\nexpose the agent over MCP, but you cannot evaluate the MCP surface itself.\n\n**Prompt CoCo:**\n\n> Explain what an MCP server exposes in Snowflake and what I would use one for.\n\n> If I exposed this agent over MCP, what governance still applies and what becomes my responsibility?\n\nWorth knowing before you build on it: **agent evaluations do not currently support MCP\nservers as tools.** The run completes, but no MCP tool is called, so the results say\nnothing about that path."
+    },
+    {
+      "type": "markdown",
+      "source": "## Optional: Streaming Ingestion\n\n**Facilitator demo.** The official quickstart streams new orders in with the Snowpipe\nStreaming SDK, which starts by generating an RSA key pair and running a Python client. That\nis not a browser activity, so it is a demonstration here rather than an exercise.\n\n**Prompt CoCo:**\n\n> Explain how Snowpipe Streaming would fit into the pipeline we built, and what it would replace.\n\nThe pipeline you built already handles new data arriving: the dynamic tables refresh\nincrementally on a one-minute lag regardless of how rows land. Streaming changes how rows\narrive, not what happens after."
+    },
+    {
+      "type": "markdown",
+      "source": "## Cleanup and Troubleshooting\n\nNothing needs cleaning up. Your account is yours, and the objects are worth keeping if you\nwant to carry on afterwards. If you do want to reset:"
+    },
+    {
+      "type": "sql",
+      "name": "cleanup_and_troubleshooting",
+      "source": "-- Suspends compute without destroying anything you built.\nALTER WAREHOUSE FISERV_WH SUSPEND;\nALTER WAREHOUSE FISERV_GEN2_WH SUSPEND;"
+    },
+    {
+      "type": "markdown",
+      "source": "| Symptom | Cause |\n|---|---|\n| Error 000630 on an interactive warehouse | Five second statement timeout. Use `FISERV_WH` for anything that is not a point lookup |\n| Agent reports €3.2M as revenue | Response instructions did not land. Rewrite them explicitly |\n| Evaluation scores 0.0 on tool selection | Usually the expected-tool list, not the agent |\n| Observability tab is empty | No real conversations yet. Evaluations do not populate it |\n| A dynamic table refreshes FULL | Refresh mode was not set explicitly; Snowflake judged the query complex |"
+    },
+    {
+      "type": "markdown",
+      "source": "## Close\n\nAcross two sessions you built a monitored, tested pipeline; put a governed agent on top of\nit; proved its answers against query-derived ground truth; found that two of your own\nanswer keys and one of your metrics were wrong; and shipped it as an app.\n\nThe recurring lesson is the one worth taking back: **the failure mode in all of this is not\nan error message. It is a plausible number.** The fan-out that triples volume, the monitor\non the wrong column, the refresh mode you did not set, total fees reported as revenue, and\nan evaluation that fails a correct answer. None of them threw an error. Every one returned\nsomething that looked completely fine."
+    }
+  ]
+}

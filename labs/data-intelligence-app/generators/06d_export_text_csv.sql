@@ -1,0 +1,47 @@
+-- Fiserv Snowcamp Workshop: export the generated text corpora to CSV.
+-- Runs ONCE on the build account. The resulting files are committed to the repo
+-- and loaded on attendee accounts with COPY INTO from the Git repository stage,
+-- so nobody calls an LLM at setup and everyone gets byte-identical text.
+
+USE ROLE ACCOUNTADMIN;
+USE DATABASE FISERV_PAYMENTS_DB;
+USE SCHEMA RAW;
+USE WAREHOUSE FISERV_BUILD_WH;
+
+-- Quoted CSV, uncompressed, with a header. FIELD_OPTIONALLY_ENCLOSED_BY matters:
+-- the free text contains commas and apostrophes.
+CREATE OR REPLACE FILE FORMAT CSV_EXPORT
+  TYPE = CSV
+  FIELD_DELIMITER = ','
+  FIELD_OPTIONALLY_ENCLOSED_BY = '"'
+  COMPRESSION = NONE
+  NULL_IF = ()
+  EMPTY_FIELD_AS_NULL = FALSE;
+
+CREATE OR REPLACE STAGE TEXT_EXPORT FILE_FORMAT = CSV_EXPORT;
+
+COPY INTO @TEXT_EXPORT/merchant_feedback.csv
+FROM (
+    SELECT FEEDBACK_ID, MERCHANT_ID, FEEDBACK_DATE, RATING, FEEDBACK_THEME, FEEDBACK_TEXT
+    FROM MERCHANT_FEEDBACK
+    ORDER BY FEEDBACK_ID
+)
+FILE_FORMAT = CSV_EXPORT
+HEADER = TRUE
+SINGLE = TRUE
+MAX_FILE_SIZE = 104857600
+OVERWRITE = TRUE;
+
+COPY INTO @TEXT_EXPORT/support_cases.csv
+FROM (
+    SELECT CASE_ID, MERCHANT_ID, OPENED_DATE, CASE_CATEGORY, PRIORITY, CASE_THEME, CASE_TEXT
+    FROM SUPPORT_CASES
+    ORDER BY CASE_ID
+)
+FILE_FORMAT = CSV_EXPORT
+HEADER = TRUE
+SINGLE = TRUE
+MAX_FILE_SIZE = 104857600
+OVERWRITE = TRUE;
+
+LIST @TEXT_EXPORT;

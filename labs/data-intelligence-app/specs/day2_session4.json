@@ -1,0 +1,229 @@
+{
+  "cells": [
+    {
+      "type": "markdown",
+      "source": "# Session 4 — Analytics and ETL with CoCo\n\n**Building an End-to-End Application Using CoCo on Snowflake**\n*Fiserv Snowcamp, Dublin, 3 September 2026*"
+    },
+    {
+      "type": "markdown",
+      "source": "> **How to use this notebook.** Every step gives you two paths that reach the same result.\n>\n> **Prompt CoCo** - open the **Cortex Code** panel in this workspace and type the quoted text. CoCo writes the SQL, runs it, and shows the result. Read what it proposes before you accept it: deciding whether the answer is right is the skill this session teaches.\n>\n> **Run the SQL cell** - the cell underneath does the same job directly. Use it if you want precise control, or to catch up if you fall behind.\n>\n> Work through the cells in order."
+    },
+    {
+      "type": "markdown",
+      "source": "## Overview\n\nIn this hands-on lab you will build a complete AI-powered payments analytics platform\nentirely within Snowflake, with no external infrastructure and nothing installed on your\nlaptop. Using Snowflake CoCo in Snowsight as your AI-assisted development environment,\nyou will work through the full data lifecycle: explore acquiring data you have never seen\nbefore, monitor its quality with Data Metric Functions, transform it through a three-tier\nDynamic Tables pipeline, build tested analytical models with dbt, compare Gen2 warehouses\nagainst standard ones, and serve sub-second point lookups with Interactive Tables.\n\nSession 5 puts a Cortex Agent on top of what you build here and asks the harder question:\nhow do you know the answers are right?\n\n### What You'll Learn\n\n- Accelerate development with Snowflake CoCo in Snowsight (AI-assisted SQL, deployment, and data exploration)\n- Explore an unfamiliar schema and reach a defensible number without being told the grain\n- Monitor data quality automatically with Data Metric Functions, and find what they miss\n- Transform data with a three-tier Dynamic Tables pipeline and verify the refresh mode you actually got\n- Build analytical models with dbt, and diagnose failing tests rather than silencing them\n- Compare Gen2 warehouses against standard warehouses honestly\n- Serve low-latency queries at high concurrency with Interactive Tables\n- Create a custom CoCo skill so a one-off check becomes something the next person inherits\n\n### What You'll Build\n\nA production-grade payments analytics platform on Snowflake: a monitored, tested,\nincrementally refreshing pipeline over 30 million fee lines, served for low-latency\nlookups, with a reusable data quality skill. Everything you build here is what session 5's\nagent will answer questions from.\n\n### Prerequisites\n\n- A browser and your Snowflake account details. Nothing to install.\n- Basic familiarity with SQL. You will read more of it than you write.\n\n### The Data\n\nFiserv acquiring data for June to September 2025, in euro. Two million merchants, ten\nmillion authorisations, 30 million fee lines, plus merchant feedback and support cases as\nfree text.\n\n| Object | Grain | Matters because |\n|---|---|---|\n| `RAW.AUTHORISATIONS` | one row per authorisation attempt | attempts are not volume |\n| `RAW.FEE_LINES` | **three rows per authorisation** | joining it to authorisations inflates any sum |\n| `RAW.MERCHANTS` | one row per merchant | carries the row access policy used in session 5 |\n| `RAW.MERCHANT_FEEDBACK` | one row per comment | free text, searched not queried |\n| `RAW.SUPPORT_CASES` | one row per case | free text |\n\n### Table of Contents\n\n1. Setup\n2. Explore Your Data\n3. Data Quality\n4. Dynamic Tables Pipeline\n5. dbt Analytics\n6. Gen2 Warehouse: Optima Indexing\n7. Interactive Tables\n8. CoCo Custom Skill"
+    },
+    {
+      "type": "markdown",
+      "source": "## Setup\n\nYour account was provisioned yesterday while the 101 slides were running, so there is\nnothing to install and nothing to clone. This step confirms it worked.\n\nOpen **Projects → Workspaces** in Snowsight and open your workspace. Confirm `AGENTS.md`\nis present. CoCo reads it automatically, so it already knows the payments schemas and the\nfour definitions that are easy to get wrong.\n\n**Prompt CoCo:**\n\n> Run the verification script at generators/99_verify_setup.sql and show me any row that does not say PASS.\n\nOr run the SQL directly:\n\nFirst pin your context. Every cell below depends on this, and the unqualified\n`INFORMATION_SCHEMA` calls later on resolve against whatever database is current."
+    },
+    {
+      "type": "sql",
+      "name": "setup",
+      "source": "-- Pins role, database, schema and warehouse for every cell below. Re-run this if a\n-- later cell cannot find an object.\nUSE ROLE ACCOUNTADMIN;\nUSE DATABASE FISERV_PAYMENTS_DB;\nUSE SCHEMA RAW;\nUSE WAREHOUSE FISERV_WH;"
+    },
+    {
+      "type": "markdown",
+      "source": "### Verify Your Account\n\nYour account was provisioned before the workshop. **Run this before anything else.** It is\nthe difference between finding a problem now and finding it at 09:30 with the room ahead of\nyou."
+    },
+    {
+      "type": "sql",
+      "name": "setup_2",
+      "source": "-- Every row must say PASS. Run this first, every session.\nEXECUTE IMMEDIATE FROM\n  @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/data-intelligence-app/generators/99_verify_setup.sql;"
+    },
+    {
+      "type": "markdown",
+      "source": "Expect **20 rows, all PASS**. The checks cover row counts on the four RAW tables, the five\ndynamic tables, both Cortex Search services, the semantic view, the interactive tables, and\nthe governance policies.\n\nIf any row says FAIL, tell your facilitator the row name before you try to fix it. Do not\nstart the lab on a broken account.\n\n### If Verification Fails\n\nEverything in this workshop is built by one server-side script. There is no client, no CLI\nand no local install: `EXECUTE IMMEDIATE FROM` reads the SQL straight off an internal stage\nand runs it in your account."
+    },
+    {
+      "type": "sql",
+      "name": "setup_3",
+      "source": "-- Rebuilds the whole payments environment from scratch. Roughly six minutes.\n-- ONLY run this if verification failed. It drops and recreates the databases, so\n-- anything you have already built in this session is lost.\nEXECUTE IMMEDIATE FROM\n  @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/data-intelligence-app/generators/00_setup_all.sql;"
+    },
+    {
+      "type": "markdown",
+      "source": "That orchestrator runs eleven steps in order: `01_environment.sql` creates the database,\nschemas and warehouses; `02` to `06` build 2,000,000 merchants, the authorisations, 30.2\nmillion fee lines and the text corpora; `07` to `11` build the dynamic tables, Cortex Search\nservices, semantic view, interactive tables and the governance policies.\n\nTwo things it deliberately does **not** build: the Cortex Agent and the evaluation set. Those\nare the session 5 exercises, and pre-building them would hand you the answers.\n\nRe-run the verification afterwards and confirm 20 PASS before continuing."
+    },
+    {
+      "type": "sql",
+      "name": "setup_4",
+      "source": "-- Confirms yesterday's provisioning. Twenty assertions; every one must say PASS.\nEXECUTE IMMEDIATE FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/data-intelligence-app/generators/99_verify_setup.sql;"
+    },
+    {
+      "type": "markdown",
+      "source": "Every one of the twenty rows must say PASS. If any row fails, tell your facilitator now\nrather than debugging into the session.\n\n**If a prompt goes wrong at any point**, do not reach for a script. You have two moves.\n\nWhen you cannot judge whether the answer is right, ask CoCo to show its working:\n\n> Show me the SQL you just ran and explain why you chose those tables and that grain. I want to check it before I trust the number.\n\nWhen you know it is wrong, say so plainly:\n\n> That is not what I expected. I wanted X but I got Y. Explain what went wrong and fix it.\n\nCoCo has `AGENTS.md` and the full schema. Recovery is a conversation, not a fallback file."
+    },
+    {
+      "type": "markdown",
+      "source": "## Explore Your Data\n\nBefore transforming anything, build a mental model of the dataset. Four questions get you\nthere, and you can ask all of them without knowing the schema.\n\n**Prompt CoCo:**\n\n> What schemas and tables are in my database?\n\nCoCo queries `INFORMATION_SCHEMA` and shows the structure: `RAW` (source tables), `DBT_STAGING`\n(staging views), `DBT_ANALYTICS` (dbt models), `DYNAMIC_TABLES` (the pipeline), `INTERACTIVE`\n(low-latency lookups) and `SEMANTIC` (the AI layer)."
+    },
+    {
+      "type": "sql",
+      "name": "explore_your_data",
+      "source": "-- The shape of the database, one row per table.\nSELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE, ROW_COUNT\nFROM FISERV_PAYMENTS_DB.INFORMATION_SCHEMA.TABLES\nWHERE TABLE_SCHEMA <> 'INFORMATION_SCHEMA'\nORDER BY TABLE_SCHEMA, TABLE_NAME;"
+    },
+    {
+      "type": "markdown",
+      "source": "Next, look at actual rows. Averages hide things that individual records do not.\n\n> Show me 5 sample rows from the authorisations table"
+    },
+    {
+      "type": "sql",
+      "name": "explore_your_data_2",
+      "source": "SELECT * FROM FISERV_PAYMENTS_DB.RAW.AUTHORISATIONS LIMIT 5;"
+    },
+    {
+      "type": "markdown",
+      "source": "Then the scale of it:\n\n> How many authorisations, merchants and payment products do we have?"
+    },
+    {
+      "type": "sql",
+      "name": "explore_your_data_3",
+      "source": "-- Row counts across the source tables.\nSELECT 'AUTHORISATIONS' AS TABLE_NAME, COUNT(*) AS ROW_COUNT FROM FISERV_PAYMENTS_DB.RAW.AUTHORISATIONS\nUNION ALL SELECT 'FEE_LINES',         COUNT(*) FROM FISERV_PAYMENTS_DB.RAW.FEE_LINES\nUNION ALL SELECT 'MERCHANTS',         COUNT(*) FROM FISERV_PAYMENTS_DB.RAW.MERCHANTS\nUNION ALL SELECT 'PAYMENT_PRODUCTS',  COUNT(*) FROM FISERV_PAYMENTS_DB.RAW.PAYMENT_PRODUCTS\nUNION ALL SELECT 'MERCHANT_FEEDBACK', COUNT(*) FROM FISERV_PAYMENTS_DB.RAW.MERCHANT_FEEDBACK\nUNION ALL SELECT 'SUPPORT_CASES',     COUNT(*) FROM FISERV_PAYMENTS_DB.RAW.SUPPORT_CASES\nORDER BY ROW_COUNT DESC;"
+    },
+    {
+      "type": "markdown",
+      "source": "Expect **10,000,000** authorisations, **30,253,689** fee lines, **2,000,000** merchants,\n**10** payment products, **1,200** feedback rows and **1,200** support cases.\n\nNote the ratio between the first two: roughly **three fee lines per authorisation**. Hold on\nto that number, because it matters shortly.\n\nFinally, the time window:\n\n> What's the date range of our authorisation data?"
+    },
+    {
+      "type": "sql",
+      "name": "explore_your_data_4",
+      "source": "SELECT MIN(AUTH_TIMESTAMP)::DATE AS FIRST_DAY,\n       MAX(AUTH_TIMESTAMP)::DATE AS LAST_DAY,\n       COUNT(DISTINCT DATE_TRUNC('month', AUTH_TIMESTAMP)) AS MONTHS\nFROM FISERV_PAYMENTS_DB.RAW.AUTHORISATIONS;"
+    },
+    {
+      "type": "markdown",
+      "source": "Expect **1 June to 30 September 2025**, four months. The data is historical on purpose, so\nevery figure in this guide is reproducible.\n\nThat is your mental model. Now the headline number.\n\n> What was our total processed volume for the whole period, and how does it split by acquiring region?"
+    },
+    {
+      "type": "sql",
+      "name": "explore_your_data_5",
+      "source": "-- The headline figure: approved volume by region. Approved only, because a declined\n-- transaction earns nothing.\nSELECT m.ACQUIRING_REGION,\n       COUNT(*)                     AS APPROVED_AUTHS,\n       ROUND(SUM(a.AUTH_AMOUNT), 2) AS PROCESSED_VOLUME_EUR\nFROM FISERV_PAYMENTS_DB.RAW.AUTHORISATIONS a\nJOIN FISERV_PAYMENTS_DB.RAW.MERCHANTS m\n  ON a.MERCHANT_ID = m.MERCHANT_ID\nWHERE a.AUTH_RESULT = 'Approved'\nGROUP BY m.ACQUIRING_REGION\nORDER BY PROCESSED_VOLUME_EUR DESC;"
+    },
+    {
+      "type": "markdown",
+      "source": "Expect roughly **€461.7M** in total, with Southern Europe largest at about €164.3M. Note\nthe `AUTH_RESULT = 'Approved'` filter: a declined transaction earns nothing, and including\ndeclines is the most common error in payments reporting.\n\n### The Trap\n\nYou now know there are three fee lines per authorisation. Watch what happens if you forget it.\nAsk this deliberately badly:\n\n> Join AUTHORISATIONS to FEE_LINES and give me total processed volume by region."
+    },
+    {
+      "type": "sql",
+      "name": "explore_your_data_6",
+      "source": "-- Deliberately wrong. FEE_LINES has three rows per authorisation, so joining it\n-- multiplies every AUTH_AMOUNT by three before summing.\nSELECT m.ACQUIRING_REGION,\n       ROUND(SUM(a.AUTH_AMOUNT), 2) AS INFLATED_VOLUME_EUR\nFROM FISERV_PAYMENTS_DB.RAW.AUTHORISATIONS a\nJOIN FISERV_PAYMENTS_DB.RAW.FEE_LINES f\n  ON a.AUTH_ID = f.AUTH_ID\nJOIN FISERV_PAYMENTS_DB.RAW.MERCHANTS m\n  ON a.MERCHANT_ID = m.MERCHANT_ID\nWHERE a.AUTH_RESULT = 'Approved'\nGROUP BY m.ACQUIRING_REGION\nORDER BY INFLATED_VOLUME_EUR DESC;"
+    },
+    {
+      "type": "markdown",
+      "source": "Read the answer carefully. If the total comes back near **€1,565M** rather than €461.7M,\nthe fan-out has inflated it about 3.4 times. Push back:\n\n> That looks about three times too high. Explain why, and give me the correct figure.\n\n**What to take away:** a plausible number is not a correct number. The fan-out is\ninvisible unless you know the grain, and nothing errored."
+    },
+    {
+      "type": "markdown",
+      "source": "## Data Quality\n\n**Data Metric Functions (DMFs)** let you attach automated quality checks directly to table\ncolumns. Snowflake runs them on a schedule and stores results in\n`SNOWFLAKE.LOCAL.DATA_QUALITY_MONITORING_RESULTS`. Built-in DMFs include `NULL_COUNT`,\n`DUPLICATE_COUNT`, `UNIQUE_COUNT` and `FRESHNESS`, or you can write custom ones.\n\nThink smoke detectors for your data: useful, and only where you fitted them.\n\n**Prompt CoCo:**\n\n> What Data Metric Functions are attached to tables in FISERV_PAYMENTS_DB.RAW, and what are they monitoring?"
+    },
+    {
+      "type": "sql",
+      "name": "data_quality",
+      "source": "-- Which columns on FEE_LINES carry a quality monitor, and on what schedule.\nSELECT REF_ENTITY_NAME AS TABLE_NAME,\n       METRIC_NAME,\n       REF_ARGUMENTS    AS MONITORED_COLUMN,\n       SCHEDULE\nFROM TABLE(INFORMATION_SCHEMA.DATA_METRIC_FUNCTION_REFERENCES(\n    REF_ENTITY_NAME => 'FISERV_PAYMENTS_DB.RAW.FEE_LINES',\n    REF_ENTITY_DOMAIN => 'TABLE'));"
+    },
+    {
+      "type": "markdown",
+      "source": "Then look at what they are reporting:\n\n> Show me the latest results from those monitors. Are any of them reporting violations?\n\nYou will see NULLs reported on `AUTH_AMOUNT` and `FEE_AMOUNT_EUR`, and a clean result on\n`FEE_CATEGORY`. At this point the data looks like it has two known issues, both watched.\n\n### Discover the Gap\n\n**Prompt CoCo:**\n\n> Check every column in FEE_LINES for NULLs, not just the monitored ones. Is anything unmonitored also broken?"
+    },
+    {
+      "type": "sql",
+      "name": "data_quality_2",
+      "source": "-- NULL counts across every column, monitored or not. This is the cell that finds\n-- what the monitors missed.\nSELECT COUNT(*)                                            AS TOTAL_ROWS,\n       COUNT_IF(FEE_TYPE IS NULL)                          AS FEE_TYPE_NULLS,\n       COUNT_IF(FEE_CATEGORY IS NULL)                      AS FEE_CATEGORY_NULLS,\n       COUNT_IF(FEE_AMOUNT_EUR IS NULL)                    AS FEE_AMOUNT_NULLS\nFROM FISERV_PAYMENTS_DB.RAW.FEE_LINES;"
+    },
+    {
+      "type": "markdown",
+      "source": "`FEE_TYPE` has **152 NULLs and no monitor on it**. The monitor was attached to\n`FEE_CATEGORY`, the column next to it, which is completely clean. Two monitors, both\nreporting comfortably, and the actual problem sitting in the gap between them.\n\n### Fix the Coverage\n\n**Prompt CoCo:**\n\n> Move the monitor to where it should have been, and tell me what the count is once it runs."
+    },
+    {
+      "type": "sql",
+      "name": "data_quality_3",
+      "source": "-- Attach the monitor to the column that is actually broken.\nALTER TABLE FISERV_PAYMENTS_DB.RAW.FEE_LINES\n  ADD DATA METRIC FUNCTION SNOWFLAKE.CORE.NULL_COUNT ON (FEE_TYPE);"
+    },
+    {
+      "type": "markdown",
+      "source": "**What to take away:** a monitor tells you about the column it is attached to and nothing\nelse. Coverage is a decision, and yours was wrong. This is the most common data quality\nfailure in production and it never shows up as an error."
+    },
+    {
+      "type": "markdown",
+      "source": "## Dynamic Tables Pipeline\n\n**Dynamic Tables** are declarative data pipelines. You define the target state as a SQL query\nand Snowflake handles incremental refresh automatically. The `TARGET_LAG` parameter controls\nfreshness: set a time-based lag such as `'1 minute'`, or use `DOWNSTREAM`.\n\n`DOWNSTREAM` is worth reading carefully, because the name describes the *direction the\nschedule comes from*, not what triggers it. A `DOWNSTREAM` table has no schedule of its own;\nit refreshes when a table that **depends on it** needs fresh data, taking its timing from the\nshortest lag among its consumers. A `DOWNSTREAM` table with no consumers therefore never\nrefreshes on its own, and Snowflake raises no warning about that.\n\nThis pipeline sets an explicit one-minute lag on the tier 1 tables and `DOWNSTREAM` on\neverything below, which is why the tier 3 tables hold data from their initial build.\n\n**Prompt CoCo:**\n\n> Explain the Dynamic Table pipeline in FISERV_PAYMENTS_DB.DYNAMIC_TABLES. Draw the dependency graph, and tell me the target lag and refresh mode of each table."
+    },
+    {
+      "type": "sql",
+      "name": "dynamic_tables_pipeline",
+      "source": "-- List the pipeline. SHOW exposes the refresh mode, which the DDL does not tell you.\nSHOW DYNAMIC TABLES IN SCHEMA FISERV_PAYMENTS_DB.DYNAMIC_TABLES;"
+    },
+    {
+      "type": "sql",
+      "name": "dynamic_tables_pipeline_2",
+      "source": "-- Read the previous cell's output as a table. REFRESH_MODE_REASON is the column that\n-- matters: null means you got what you asked for.\nSELECT \"name\"                AS DYNAMIC_TABLE,\n       \"target_lag\"          AS TARGET_LAG,\n       \"refresh_mode\"        AS REFRESH_MODE,\n       \"refresh_mode_reason\" AS REFRESH_MODE_REASON\nFROM TABLE(RESULT_SCAN(LAST_QUERY_ID()));"
+    },
+    {
+      "type": "markdown",
+      "source": "Five tables in three tiers. Tiers 1 and 2 use a one-minute lag; tier 3 uses `DOWNSTREAM`,\nwhich means it refreshes only when something downstream needs it.\n\n### Why Refresh Mode Matters\n\n**Prompt CoCo:**\n\n> Why is every one of these INCREMENTAL rather than FULL, and what would have happened if I had not set the refresh mode explicitly?\n\nThis is the point of the step. Left to itself, Snowflake looks at the tier 1 joins, judges\nthem complex, and **silently sets refresh mode to FULL**. That then cascades: tier 2 fails\nto build at all, because change tracking is not supported on a dynamic table that\nrefreshes FULL. A pipeline that appears to work can be quietly reprocessing everything on\nevery cycle.\n\n`REFRESH_MODE_REASON` is null when you got what you asked for. It only fills in to explain\na downgrade, so a null there is good news.\n\n### Explore Results\n\n**Prompt CoCo:**\n\n> Add a new tier 3 dynamic table showing chargeback rate by merchant segment and month. Make sure it refreshes incrementally, and prove to me that it does.\n\nA good answer proves it from `DYNAMIC_TABLE_REFRESH_HISTORY` after a refresh, not from the\nDDL it just wrote. Anything that only shows you the `CREATE` statement has not proved\nanything.\n\n> Insert a handful of new authorisations into RAW.AUTHORISATIONS and show me the change flowing through all three tiers.\n\n**What to take away:** declarative does not mean unexamined. Always check the refresh mode\nyou actually got, not the one you assumed."
+    },
+    {
+      "type": "markdown",
+      "source": "## dbt Analytics\n\n**dbt Projects on Snowflake** makes a dbt project a first-class Snowflake object. You run it\nwith `EXECUTE DBT PROJECT` and it executes server-side, so there is no local dbt install, no\nvirtualenv and no profiles.yml to manage. That is what makes it usable from a browser.\n\nModels are SQL files with dependencies expressed as `ref()`, materialising here into\n`DBT_ANALYTICS`. Tests live alongside the models and run as part of the build, which means a\nfailing test is a build signal rather than something you discover in a dashboard later.\n\n**Prompt CoCo:**\n\n> There is a dbt project in this workspace. Explain its structure: what the staging models do, what the analytics models do, and what the tests check.\n\nThen run it:\n\n> Run the whole project and tests.\n\n**It will fail. That is the exercise.** 31 tests pass and 2 fail:\n`not_null_fct_fee_economics_net_fee_revenue_eur` (60 rows) and\n`not_null_fct_merchant_performance_processed_volume_eur` (42 rows).\n\n### Diagnose Before Fixing\n\n**Prompt CoCo:**\n\n> Two tests failed. Do not fix them yet. Explain exactly why they failed and trace the cause back to the source data."
+    },
+    {
+      "type": "sql",
+      "name": "dbt_analytics",
+      "source": "-- The chain to find: all-NULL aggregate groups. SUM() of an all-NULL group returns\n-- NULL, not 0, so bad source rows become broken aggregate rows further downstream.\nSELECT COUNT_IF(FEE_AMOUNT_EUR IS NULL) AS NULL_FEE_AMOUNTS\nFROM FISERV_PAYMENTS_DB.RAW.FEE_LINES;"
+    },
+    {
+      "type": "sql",
+      "name": "dbt_analytics_2",
+      "source": "-- The second half of the chain: NULL authorisation amounts.\nSELECT COUNT_IF(AUTH_AMOUNT IS NULL) AS NULL_AUTH_AMOUNTS\nFROM FISERV_PAYMENTS_DB.RAW.AUTHORISATIONS;"
+    },
+    {
+      "type": "markdown",
+      "source": "215 NULL fee amounts and 189 NULL auth amounts land in aggregate groups where **every**\nrow is NULL. So 404 bad source rows become 102 broken aggregate rows. **The models are\ncorrect. The data is not.**\n\n### Fix It\n\n**Prompt CoCo:**\n\n> Now fix it. I want the money to still reconcile, and I want the fix to make the missing data visible rather than hiding it. Explain the tradeoff in whatever you choose.\n\nThere is more than one defensible answer. Coalescing to zero makes the build pass but\nburies the problem. Excluding the rows changes the totals. Splitting out an explicit\n\"unknown\" bucket keeps both the total and the visibility. A good answer states which it\nchose and what it gave up; any answer that silently coalesces to zero without saying so\nhas failed.\n\n> Re-run the project and confirm we are green. Then add a test that would have caught this at the staging layer instead of three models downstream.\n\n**What to take away:** a failing test is information. The instinct to make the red go away\nis what turns a data quality problem into a reporting problem."
+    },
+    {
+      "type": "markdown",
+      "source": "## Gen2 Warehouse: Optima Indexing\n\nGen2 warehouses bring **Snowflake Optima**, a set of optimisations that learn from your query\npatterns and apply themselves with no configuration, no clustering keys to define and no extra\ncost. There are three parts, and they do different jobs:\n\n| Feature | What it does |\n|---|---|\n| **Optima Indexing** | Spots repetitive point-lookup queries and builds hidden indexes to accelerate them. Built on the search optimization service. |\n| **Optima Metadata** | Adds metadata for columns used inefficiently in filters, improving **partition pruning**. |\n| **Optima Planning** | Learns better query plans by observing how queries actually execute. |\n\nSo indexing accelerates lookups and metadata improves pruning. It is a common slip to credit\npruning to indexing. All three are available on Gen2 standard and Adaptive warehouses, in\nevery edition.\n\nBecause Optima applies itself, the only way to know it fired is to look. Query Profile's\n**Statistics** pane has a row labelled *Partitions pruned by Snowflake Optima*, the **Query\ninsights** pane shows *Snowflake Optima used*, and both are queryable through the\n`QUERY_INSIGHTS` view. Measure the difference, then confirm the cause rather than assuming it.\n\n**Prompt CoCo:**\n\n> Compare FISERV_WH and FISERV_GEN2_WH. What is different about them?"
+    },
+    {
+      "type": "sql",
+      "name": "gen2_warehouse_optima_indexing",
+      "source": "-- Compare the two warehouses. Look at the GENERATION property.\nSHOW WAREHOUSES LIKE 'FISERV_%WH';"
+    },
+    {
+      "type": "markdown",
+      "source": "### Compare to Standard Warehouse\n\n**Prompt CoCo:**\n\n> Write me an expensive analytical query over AUTHORISATIONS and FEE_LINES, something with real joins and aggregation rather than a point lookup. Run it on both warehouses and compare execution time, not elapsed time. Run each one twice and use the second run, so I am not measuring warehouse resume."
+    },
+    {
+      "type": "sql",
+      "name": "gen2_warehouse_optima_indexing_2",
+      "source": "-- Turn off the result cache first, or the second run returns instantly and\n-- measures nothing at all.\nALTER SESSION SET USE_CACHED_RESULT = FALSE;"
+    },
+    {
+      "type": "sql",
+      "name": "gen2_warehouse_optima_indexing_3",
+      "source": "-- Server-side timings for both warehouses. Judge on EXECUTION_MS, not on the elapsed\n-- time the notebook reports, which includes round trip.\nSELECT WAREHOUSE_NAME,\n       WAREHOUSE_SIZE,\n       EXECUTION_TIME AS EXECUTION_MS,\n       COMPILATION_TIME AS COMPILE_MS,\n       BYTES_SCANNED\nFROM TABLE(INFORMATION_SCHEMA.QUERY_HISTORY_BY_SESSION())\nWHERE WAREHOUSE_NAME IN ('FISERV_WH', 'FISERV_GEN2_WH')\nORDER BY START_TIME DESC\nLIMIT 10;"
+    },
+    {
+      "type": "markdown",
+      "source": "Then ask the question that matters:\n\n> Is that difference big enough to justify moving our ETL to Gen2? What would you need to measure over a week to answer that properly?\n\nA good answer refuses to generalise from one query on an idle warehouse.\n\n**What to take away:** one measurement is not a benchmark. Be honest about what a single\nnumber can and cannot tell you."
+    },
+    {
+      "type": "markdown",
+      "source": "## Interactive Tables\n\n**Interactive Tables** are purpose-built for low-latency, high-concurrency point lookups. They\nkeep data laid out for equality predicates, delivering sub-second responses for dashboard\nfilters and application queries.\n\nThree things to know before you use one:\n\n- **`CLUSTER BY` is required**, not optional. Choose the columns your most time-critical\n  `WHERE` clauses filter on, because that choice drives the performance.\n- **The table only performs when queried through an interactive warehouse with the table\n  attached** via `ALTER WAREHOUSE ... ADD TABLES`. The warehouse pre-warms a local data cache\n  for attached tables, and that cache is the actual mechanism. Query one from a standard\n  warehouse and it behaves like an ordinary table.\n- **DML is not supported** apart from `INSERT OVERWRITE`. A static interactive table never\n  refreshes until you replace it; add `TARGET_LAG` to make it a dynamic interactive table that\n  refreshes itself.\n\nThat cache is also why the first measurement in this section will mislead you.\n\n**Prompt CoCo:**\n\n> Explain the difference between INTERACTIVE.AUTH_LOOKUP and INTERACTIVE.STD_AUTH_LOOKUP. Why does one need a clustering key and the other does not?\n\n### Point Lookups\n\n**Prompt CoCo:**\n\n> Pick one AUTH_ID and query it from both tables. Compare the timings."
+    },
+    {
+      "type": "sql",
+      "name": "interactive_tables",
+      "source": "-- Grab any AUTH_ID to use for the point lookup comparison.\nSELECT AUTH_ID, AUTH_AMOUNT, MERCHANT_ID, AUTH_RESULT\nFROM FISERV_PAYMENTS_DB.INTERACTIVE.AUTH_LOOKUP\nLIMIT 1;"
+    },
+    {
+      "type": "markdown",
+      "source": "The interactive table will look **no better, and possibly worse**. Measured on this\ndataset: standard 198ms elapsed and 37ms execution, interactive 289ms elapsed and 26ms\nexecution. It wins on execution and loses on elapsed, because a single query is dominated\nby round trip.\n\n> That single lookup did not show any advantage. Why not, and what would I have to change about the test to actually exercise the feature?\n\n### Concurrency Load Test\n\n**Prompt CoCo:**\n\n> Run the load test at loadtest/interactive_concurrency_test.py with 150 queries and explain the results to me.\n\nExpect roughly:\n\n| | Standard | Interactive |\n|---|---|---|\n| Execution p50 | ~172 ms | **~17 ms** |\n| Total queueing | **~108 s** | **0 ms** |\n\n> Run it again at 100 queries. What happens to the queueing on each warehouse, and what does that tell me about how each one scales?\n\nStandard queueing goes from about 35s at 100 queries to 108s at 150. A 1.5 times load rise\nroughly triples the queueing, while interactive stays at 17ms and zero queue at both.\n\n> The wall clock times were nearly identical. Why should I ignore that number?\n\nBecause the harness is client-bound on submission and polling. Quote execution and queue\ntime, which come from Snowflake, not wall clock, which comes from Python.\n\n**Note:** interactive warehouses have a **five second statement timeout**. Scanning\n`QUERY_HISTORY` on one fails with error 000630. Use `FISERV_WH` for anything that is not\na point lookup.\n\n**What to take away:** the feature is about latency under concurrency. Demo it with one\nquery and you will conclude it does nothing, while measuring your own client."
+    },
+    {
+      "type": "markdown",
+      "source": "## CoCo Custom Skill\n\n**CoCo Custom Skills** let you package repeatable workflows into named commands that any team\nmember can invoke. A skill is a Markdown file at `.snowflake/cortex/skills/<name>/SKILL.md`\nthat defines triggers, parameters and step-by-step instructions CoCo follows when the skill is\nactivated.\n\nEvery check you have run this session was a prompt you had to remember. Make one permanent.\n\n**Prompt CoCo:**\n\n> Create a personal CoCo skill called payments-check that runs our standard data quality checks on this database: row counts against expected, NULL counts on the columns we know are dirty, whether every Dynamic Table is still INCREMENTAL, and whether processed volume reconciles between the raw tables and the dbt facts. Save it as a skill in this workspace.\n\n### Test It\n\n**Prompt CoCo:**\n\n> Now invoke the skill and show me the output.\n\nA good answer produces a skill that actually runs and returns output, not just a saved\nfile.\n\n> Add one more check to the skill: warn me if any column with NULLs has no Data Metric Function attached to it.\n\nThat last check is the one that would have caught the Data Quality gap without anybody\nthinking to look.\n\n**What to take away:** the difference between knowing a check and having a check. Skills\nare how a one-off investigation becomes something the next person inherits."
+    },
+    {
+      "type": "markdown",
+      "source": "## Close\n\nYou have gone from not knowing the schema to a monitored, tested, incrementally refreshed\npipeline with a reusable quality check, without writing a script from scratch.\n\nOne set of numbers to carry into session 5:\n\n| | |\n|---|---|\n| Processed volume | €461,744,970.59 |\n| Total fees billed | €3,203,738.89 |\n| **Net fee revenue** | **€1,934,149.64** |\n| The naive join says | €1,565,500,000 |\n\nThat last figure is what happens when `FEE_LINES` fans out three to one and nobody checks.\n\nSession 5 puts an agent on top of all of this and asks whether its answers can be trusted."
+    }
+  ]
+}

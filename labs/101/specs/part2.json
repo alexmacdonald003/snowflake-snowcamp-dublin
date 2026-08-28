@@ -1,0 +1,148 @@
+{
+  "cells": [
+    {
+      "type": "markdown",
+      "source": "# Snowflake 101 — Part 2\n\n## Data that arrives as files, and pipelines that maintain themselves\n\nIn Part 1 the data was already a table. That is not how it usually arrives.\n\nThis notebook works with **terminal telemetry**: what a payment terminal reports back about itself. Model, firmware version, connectivity, battery, and a list of events such as `card_read_failed` or `printer_jam`. It arrives as JSON, because that is what devices emit.\n\nBy the end you will have:\n\n1. Looked at a stage pointing outside your account, and one inside it\n2. Queried JSON without defining a schema first\n3. Turned a nested array into rows\n4. Built a pipeline that keeps itself up to date\n5. Asked Cortex Code to do a piece of the work for you\n\nAllow about 40 minutes."
+    },
+    {
+      "type": "sql",
+      "name": "ctx",
+      "source": "-- Pins your role, database, schema and warehouse for the rest of the notebook.\nUSE ROLE ACCOUNTADMIN;\nUSE DATABASE FISERV_101_DB;\nUSE SCHEMA RAW;\nUSE WAREHOUSE FISERV_101_WH;"
+    },
+    {
+      "type": "markdown",
+      "source": "## 1. Stages\n\nA **stage** is a location Snowflake can read files from. An *internal* stage is storage Snowflake manages for you. An *external* stage is a pointer at a bucket you or someone else owns, and Snowflake reads it in place without copying it first.\n\n`PUBLIC_DATA_STAGE` points at `s3://sfquickstarts/`, a public bucket Snowflake maintains. You have no credentials for it and do not need any, because it is public. This is here to show you what an external stage *is*.\n\n`LIST` returns one row per file, and that bucket holds a great many, so the pattern below narrows it to 300 PDFs. Snowflake is reading S3 directly to answer this."
+    },
+    {
+      "type": "sql",
+      "name": "list_external",
+      "source": "-- List an external stage. This reaches out to S3; no data is copied into Snowflake.\n-- PATTERN keeps the output sane. Without it you get the whole bucket.\nLIST @FISERV_101_DB.RAW.PUBLIC_DATA_STAGE PATTERN = '.*Invoices/.*[.]pdf';"
+    },
+    {
+      "type": "sql",
+      "name": "external_sample",
+      "source": "-- RESULT_SCAN re-reads the previous cell's output as a table, so you can query it.\n-- Useful whenever a SHOW or LIST returns more than you want to look at.\nSELECT \"name\" AS FILE_PATH, \"size\" AS SIZE_BYTES\nFROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))\nORDER BY \"size\" DESC\nLIMIT 10;"
+    },
+    {
+      "type": "sql",
+      "name": "list_internal",
+      "source": "-- The internal stage holding the terminal telemetry you will actually work with.\nLIST @FISERV_101_DB.RAW.TERMINAL_STAGE;"
+    },
+    {
+      "type": "markdown",
+      "source": "One file, roughly 900KB. That is what the setup produced, and it is enough: reading one JSON file off a stage teaches the same things as reading six.\n\nNow read it. Note that you have not defined a single column."
+    },
+    {
+      "type": "sql",
+      "name": "raw_json",
+      "source": "-- Read the file straight off the stage. $1 is the whole JSON document per row.\n-- No table, no column definitions, no load step.\nSELECT $1 AS PAYLOAD\nFROM @FISERV_101_DB.RAW.TERMINAL_STAGE (FILE_FORMAT => 'FISERV_101_DB.RAW.JSON_FF')\nLIMIT 3;"
+    },
+    {
+      "type": "markdown",
+      "source": "## 2. VARIANT\n\n`PAYLOAD` above is a **VARIANT**: a column that holds a whole JSON document, stored in a columnar format rather than as text. You reach into it with `:` for object keys and `[n]` for array positions, and you cast the result to the type you want with `::`.\n\nWithout the cast you get a VARIANT back, which prints with quotes around it and does not compare or sort the way you expect. That is the single most common mistake with semi-structured data in Snowflake."
+    },
+    {
+      "type": "sql",
+      "name": "variant_paths",
+      "source": "-- Reach into the document. Note the :: casts, and the nested device object.\nSELECT\n    $1:terminal_id::VARCHAR              AS TERMINAL_ID,\n    $1:merchant_id::NUMBER               AS MERCHANT_ID,\n    $1:reported_at::DATE                 AS REPORTED_AT,\n    $1:device.model::VARCHAR             AS DEVICE_MODEL,\n    $1:device.firmware_version::VARCHAR  AS FIRMWARE_VERSION,\n    $1:device.connectivity::VARCHAR      AS CONNECTIVITY,\n    $1:device.battery_percent::NUMBER    AS BATTERY_PERCENT,\n    ARRAY_SIZE($1:events)                AS EVENT_COUNT\nFROM @FISERV_101_DB.RAW.TERMINAL_STAGE (FILE_FORMAT => 'FISERV_101_DB.RAW.JSON_FF')\nLIMIT 10;"
+    },
+    {
+      "type": "markdown",
+      "source": "Some `BATTERY_PERCENT` values are null. That is deliberate: a third of these terminals are mains powered and do not report a battery at all. Missing keys in JSON return null rather than failing, which is convenient and also how bad data gets through unnoticed.\n\n## 3. FLATTEN\n\nEvery document has an `events` array. `ARRAY_SIZE` told you how many, but you cannot filter or group on the contents while they are still an array.\n\n**FLATTEN** turns each array element into its own row. You use it as a lateral join, so each output row keeps its parent's columns alongside the element."
+    },
+    {
+      "type": "sql",
+      "name": "flatten_events",
+      "source": "-- One row per event rather than one row per terminal report.\n-- e.VALUE is the array element; e.INDEX is its position.\nSELECT\n    t.$1:terminal_id::VARCHAR      AS TERMINAL_ID,\n    e.INDEX                        AS EVENT_POSITION,\n    e.VALUE:type::VARCHAR          AS EVENT_TYPE,\n    e.VALUE:severity::VARCHAR      AS SEVERITY,\n    e.VALUE:latency_ms::NUMBER     AS LATENCY_MS\nFROM @FISERV_101_DB.RAW.TERMINAL_STAGE (FILE_FORMAT => 'FISERV_101_DB.RAW.JSON_FF') t,\n     LATERAL FLATTEN(input => t.$1:events) e\nLIMIT 12;"
+    },
+    {
+      "type": "sql",
+      "name": "event_summary",
+      "source": "-- Now that events are rows, you can aggregate them. Which faults are worst?\nSELECT\n    e.VALUE:type::VARCHAR      AS EVENT_TYPE,\n    e.VALUE:severity::VARCHAR  AS SEVERITY,\n    COUNT(*)                   AS EVENT_COUNT,\n    ROUND(AVG(e.VALUE:latency_ms::NUMBER), 1) AS AVG_LATENCY_MS\nFROM @FISERV_101_DB.RAW.TERMINAL_STAGE (FILE_FORMAT => 'FISERV_101_DB.RAW.JSON_FF') t,\n     LATERAL FLATTEN(input => t.$1:events) e\nGROUP BY EVENT_TYPE, SEVERITY\nORDER BY EVENT_COUNT DESC;"
+    },
+    {
+      "type": "python",
+      "name": "plot_events",
+      "source": "# Chart event volume by type, coloured by severity.\nimport matplotlib.pyplot as plt\n\ndf = event_summary.copy()\ncolour_for = {\"info\": \"#29B5E8\", \"warning\": \"#FF9F36\", \"error\": \"#D45B90\"}\ncolours = [colour_for.get(s, \"#8A999E\") for s in df[\"SEVERITY\"]]\n\nfig, ax = plt.subplots(figsize=(9, 4.5))\nax.barh(df[\"EVENT_TYPE\"], df[\"EVENT_COUNT\"], color=colours)\nax.set_xlabel(\"Events\")\nax.set_title(\"Terminal events by type (colour = severity)\")\nax.invert_yaxis()\nax.spines[[\"top\", \"right\"]].set_visible(False)\nplt.tight_layout()\nplt.show()"
+    },
+    {
+      "type": "markdown",
+      "source": "## 4. From query to pipeline\n\nThat aggregate is useful, so it should not be something you re-run by hand.\n\nFirst load the stage file into a table. Reading directly off a stage is fine for exploring, but a pipeline needs a table it can track changes on."
+    },
+    {
+      "type": "sql",
+      "name": "load_table",
+      "source": "-- Land the raw documents in a table, one VARIANT column, nothing reshaped yet.\n-- Keeping the raw payload means you can change your mind about the shape later.\nCREATE OR REPLACE TABLE FISERV_101_DB.RAW.TERMINAL_TELEMETRY AS\nSELECT $1 AS PAYLOAD\nFROM @FISERV_101_DB.RAW.TERMINAL_STAGE (FILE_FORMAT => 'FISERV_101_DB.RAW.JSON_FF');"
+    },
+    {
+      "type": "sql",
+      "name": "loaded_count",
+      "source": "-- Confirm what landed.\nSELECT COUNT(*) AS DOCUMENTS_LOADED FROM FISERV_101_DB.RAW.TERMINAL_TELEMETRY;"
+    },
+    {
+      "type": "markdown",
+      "source": "### Dynamic tables\n\nA **dynamic table** is defined by a query, not by a load process. You declare the result you want and a `TARGET_LAG` — how stale you are willing to let it get — and Snowflake works out what to re-compute and when. There is no task to schedule, no merge statement to write, and no ordering to get right.\n\nWhere it can, Snowflake refreshes **incrementally**: it processes only the rows that changed rather than rebuilding the whole thing. Where the query is too complex for that, it falls back to a full refresh. You will check which one you got, because the difference matters at volume and Snowflake does not always choose what you assumed."
+    },
+    {
+      "type": "sql",
+      "name": "create_dt",
+      "source": "-- A dynamic table over the raw telemetry. TARGET_LAG is the promise Snowflake\n-- makes you: this will never be more than a minute behind the source.\nCREATE OR REPLACE DYNAMIC TABLE FISERV_101_DB.ANALYTICS.TERMINAL_EVENT_SUMMARY\n  TARGET_LAG = '1 minute'\n  WAREHOUSE = FISERV_101_WH\nAS\nSELECT\n    t.PAYLOAD:device.model::VARCHAR      AS DEVICE_MODEL,\n    e.VALUE:type::VARCHAR                AS EVENT_TYPE,\n    e.VALUE:severity::VARCHAR            AS SEVERITY,\n    COUNT(*)                             AS EVENT_COUNT,\n    ROUND(AVG(e.VALUE:latency_ms::NUMBER), 1) AS AVG_LATENCY_MS\nFROM FISERV_101_DB.RAW.TERMINAL_TELEMETRY t,\n     LATERAL FLATTEN(input => t.PAYLOAD:events) e\nGROUP BY DEVICE_MODEL, EVENT_TYPE, SEVERITY;"
+    },
+    {
+      "type": "sql",
+      "name": "dt_contents",
+      "source": "-- The dynamic table already has data. Creating it ran the first refresh.\nSELECT DEVICE_MODEL, EVENT_TYPE, SEVERITY, EVENT_COUNT, AVG_LATENCY_MS\nFROM FISERV_101_DB.ANALYTICS.TERMINAL_EVENT_SUMMARY\nORDER BY EVENT_COUNT DESC\nLIMIT 10;"
+    },
+    {
+      "type": "sql",
+      "name": "show_dt",
+      "source": "-- SHOW exposes the refresh mode Snowflake chose, which the DDL does not tell you.\nSHOW DYNAMIC TABLES LIKE 'TERMINAL_EVENT_SUMMARY' IN SCHEMA FISERV_101_DB.ANALYTICS;"
+    },
+    {
+      "type": "sql",
+      "name": "dt_refresh_mode",
+      "source": "-- Which refresh mode did you actually get, and why?\n-- REFRESH_MODE should say INCREMENTAL. REFRESH_MODE_REASON is null when\n-- Snowflake gave you what you asked for; it only fills in to explain a\n-- downgrade to FULL. A null here is good news.\nSELECT \"name\" AS DYNAMIC_TABLE,\n       \"target_lag\" AS TARGET_LAG,\n       \"refresh_mode\" AS REFRESH_MODE,\n       \"refresh_mode_reason\" AS REFRESH_MODE_REASON\nFROM TABLE(RESULT_SCAN(LAST_QUERY_ID()));"
+    },
+    {
+      "type": "markdown",
+      "source": "### Prove it maintains itself\n\nFirst establish a baseline. In the seed data, Clover Flex terminals only ever report `warning` severity, never `error`, so this next cell returns **no rows at all**.\n\nThat absence is the thing you are going to change."
+    },
+    {
+      "type": "sql",
+      "name": "baseline",
+      "source": "-- Baseline: error-severity events on Clover Flex. Expect zero rows.\nSELECT DEVICE_MODEL, EVENT_TYPE, SEVERITY, EVENT_COUNT, AVG_LATENCY_MS\nFROM FISERV_101_DB.ANALYTICS.TERMINAL_EVENT_SUMMARY\nWHERE DEVICE_MODEL = 'Clover Flex' AND SEVERITY = 'error'\nORDER BY EVENT_TYPE;"
+    },
+    {
+      "type": "markdown",
+      "source": "Now add one new terminal report to the **source table**. Do not touch the dynamic table."
+    },
+    {
+      "type": "sql",
+      "name": "insert_new",
+      "source": "-- One new terminal report, with two events, both errors on a new firmware.\nINSERT INTO FISERV_101_DB.RAW.TERMINAL_TELEMETRY (PAYLOAD)\nSELECT OBJECT_CONSTRUCT(\n    'terminal_id', 'TRM999999',\n    'merchant_id', 4242,\n    'reported_at', '2025-09-30',\n    'device', OBJECT_CONSTRUCT('model', 'Clover Flex',\n                               'firmware_version', '5.0.1',\n                               'connectivity', 'cellular',\n                               'battery_percent', 12),\n    'events', ARRAY_CONSTRUCT(\n        OBJECT_CONSTRUCT('type', 'card_read_failed', 'severity', 'error', 'latency_ms', 1800),\n        OBJECT_CONSTRUCT('type', 'network_drop',     'severity', 'error', 'latency_ms', 2400))\n);"
+    },
+    {
+      "type": "sql",
+      "name": "force_refresh",
+      "source": "-- TARGET_LAG is one minute, so this would happen on its own shortly.\n-- Refreshing manually means you do not have to wait for it during the session.\nALTER DYNAMIC TABLE FISERV_101_DB.ANALYTICS.TERMINAL_EVENT_SUMMARY REFRESH;"
+    },
+    {
+      "type": "sql",
+      "name": "dt_after",
+      "source": "-- The same query as the baseline. Two rows now exist where there were none.\n-- You wrote no update logic, no MERGE, and no task.\nSELECT DEVICE_MODEL, EVENT_TYPE, SEVERITY, EVENT_COUNT, AVG_LATENCY_MS\nFROM FISERV_101_DB.ANALYTICS.TERMINAL_EVENT_SUMMARY\nWHERE DEVICE_MODEL = 'Clover Flex' AND SEVERITY = 'error'\nORDER BY EVENT_TYPE;"
+    },
+    {
+      "type": "sql",
+      "name": "refresh_history",
+      "source": "-- The refresh log. REFRESH_ACTION tells you what each refresh actually did.\n-- Expect CREATION, then possibly one or more SCHEDULED rows showing NO_DATA\n-- (target lag came round and there was nothing to do), then your MANUAL one\n-- showing INCREMENTAL. NO_DATA refreshes are near-free, which is why a tight\n-- TARGET_LAG on a quiet table is not the cost problem people assume.\nSELECT NAME, STATE, REFRESH_ACTION, REFRESH_TRIGGER,\n       DATA_TIMESTAMP, REFRESH_START_TIME\nFROM TABLE(FISERV_101_DB.INFORMATION_SCHEMA.DYNAMIC_TABLE_REFRESH_HISTORY(\n    NAME => 'FISERV_101_DB.ANALYTICS.TERMINAL_EVENT_SUMMARY'))\nORDER BY REFRESH_START_TIME;"
+    },
+    {
+      "type": "handoff",
+      "source": "## Hand-off — your first job for Cortex Code\n\n**Why:** you have written every line of SQL in this notebook so far. Cortex Code (CoCo) is built into Snowsight and can write and run it for you against your actual account, with your actual object names. From here on you will use it for the parts that are typing rather than thinking.\n\nThis is deliberately a task you could do yourself, so you can judge the answer.\n\n**Steps**\n\n1. In Snowsight, open a **Workspace** from the left-hand nav, then open the **Cortex Code** panel.\n2. Type this prompt exactly:\n\n   > In FISERV_101_DB.RAW.TERMINAL_TELEMETRY the PAYLOAD column is a VARIANT holding terminal telemetry. Find the firmware versions with the highest proportion of error-severity events. Show firmware version, total events, error events, and error rate as a percentage, worst first. Exclude firmware versions with fewer than 50 total events.\n\n3. Let it run the query it writes.\n4. Read the SQL it produced. Check three things: did it use `LATERAL FLATTEN`, did it cast with `::`, and is the error rate denominator *total events* rather than total terminals?\n5. Now ask a follow-up in the same conversation:\n\n   > Is 5.0.1 an outlier, and how confident should I be given how few reports it has?\n\n**What you should see:** a working query, and a note that firmware `5.0.1` has a very high error rate on a single report, which is not evidence of anything. The follow-up matters more than the first answer: the number is easy and the caveat is the part that stops someone acting on one data point.\n\n**Docs:** https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-code\n\n**Return here** when you have both answers."
+    },
+    {
+      "type": "markdown",
+      "source": "## What you did\n\n- Listed an **external stage** over a public bucket and an **internal stage** in your own account\n- Queried JSON straight off a stage with no schema and no load step\n- Used **VARIANT** path notation and casts, and saw what a missing key returns\n- Used **FLATTEN** to turn a nested array into rows you can group on\n- Built a **dynamic table** with a one-minute `TARGET_LAG`, then proved it picked up a new record without you writing any update logic\n- Checked the **refresh mode** rather than assuming it\n- Gave Cortex Code a task and checked its work\n\n## Where this goes\n\nTomorrow's session 4 uses the same dynamic table pattern over 30 million fee lines in three layers, and the refresh-mode question stops being academic.\n\n**Part 3** covers who is allowed to see what, and what you can do with the free-text fields you have been ignoring so far."
+    }
+  ]
+}

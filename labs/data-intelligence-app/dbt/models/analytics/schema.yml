@@ -1,0 +1,55 @@
+version: 2
+
+# EXPECTED STARTING STATE: `dbt build` FAILS 2 OF 33 TESTS. THIS IS DELIBERATE.
+#
+#   not_null_fct_fee_economics_net_fee_revenue_eur      -> 60 rows
+#   not_null_fct_merchant_performance_processed_volume_eur -> 42 rows
+#
+# Cause: RAW.FEE_LINES has 215 planted NULL FEE_AMOUNT_EUR and RAW.AUTHORISATIONS has
+# 189 planted NULL AUTH_AMOUNT. Where every row in an aggregate group is NULL, SUM()
+# returns NULL rather than 0, so the defect propagates from 404 raw rows into 102
+# broken aggregate rows. The models are correct; the data is not.
+#
+# The session-4 exercise is for attendees to run `dbt build`, get a red result, ask
+# CoCo why two tests failed, and trace the NULLs back to source. The fix is to make
+# the aggregation explicit about missing values (ZEROIFNULL on the summed column, or
+# excluding NULL-amount rows upstream and recording that decision). Do NOT pre-fix
+# these models: a green build on the first run removes the exercise.
+
+models:
+  - name: int_merchant_daily
+    description: Merchant x day grain, from authorisations only. No fee fan-out.
+    columns:
+      - name: merchant_id
+        tests: [not_null]
+      - name: auth_date
+        tests: [not_null]
+
+  - name: fct_merchant_performance
+    description: Merchant x month grain, rolled up from int_merchant_daily.
+    columns:
+      - name: merchant_id
+        tests: [not_null]
+      - name: processed_volume_eur
+        tests: [not_null]
+
+  - name: fct_fee_economics
+    description: Merchant x month x fee type grain.
+    columns:
+      - name: fee_type
+        # Safe here only because NULLs were coalesced to 'Unclassified' upstream.
+        tests: [not_null]
+      - name: net_fee_revenue_eur
+        tests: [not_null]
+
+  - name: dim_merchant_enriched
+    description: One row per merchant, including merchants that never transacted.
+    columns:
+      - name: merchant_id
+        tests: [unique, not_null]
+      - name: has_transacted
+        tests: [not_null]
+      - name: merchant_segment
+        tests:
+          - accepted_values:
+              values: ['Enterprise', 'Mid-Market', 'SMB']

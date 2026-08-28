@@ -1,0 +1,123 @@
+{
+  "cells": [
+    {
+      "type": "markdown",
+      "source": "# Snowflake 101 — Part 3\n\n## Who can see what, and what the text is telling you\n\nTwo topics that look unrelated and are not. Both are about data you hold but should not treat casually: personal information you must restrict, and free text you have been throwing away.\n\nThe data is 300 pieces of merchant feedback, each with a rating, a stated theme, the merchant's own words, and a contact email address.\n\nBy the end you will have:\n\n1. Found personal data sitting in the clear\n2. Masked it without changing the table or any query that reads it\n3. Proved the mask works by becoming a different role\n4. Made Snowflake read all 300 pieces of feedback and tell you what is in them\n5. Checked whether it agreed with the themes a human assigned\n\nAllow about 40 minutes."
+    },
+    {
+      "type": "sql",
+      "name": "ctx",
+      "source": "-- Pins your role, database, schema and warehouse for the rest of the notebook.\nUSE ROLE ACCOUNTADMIN;\nUSE DATABASE FISERV_101_DB;\nUSE SCHEMA GOVERNED;\nUSE WAREHOUSE FISERV_101_WH;"
+    },
+    {
+      "type": "markdown",
+      "source": "## 1. The problem\n\nLook at the table. Everything here is synthetic, but read the last column as though it were not."
+    },
+    {
+      "type": "sql",
+      "name": "feedback_sample",
+      "source": "-- The feedback corpus. CONTACT_EMAIL is the column that should worry you.\nSELECT FEEDBACK_ID, MERCHANT_ID, FEEDBACK_DATE, RATING,\n       FEEDBACK_THEME, CONTACT_EMAIL,\n       LEFT(FEEDBACK_TEXT, 90) AS FEEDBACK_EXTRACT\nFROM FISERV_101_DB.GOVERNED.MERCHANT_FEEDBACK\nORDER BY FEEDBACK_DATE\nLIMIT 8;"
+    },
+    {
+      "type": "markdown",
+      "source": "Anyone who can query this table can read every contact address in it. There is no way to grant access to the feedback without also granting access to the addresses, because access in SQL is granted per column at best and usually per table.\n\n## 2. Masking policies\n\nA **masking policy** is a rule attached to a column that changes what the column returns depending on who is asking. The table is not modified, the data is not copied, and the queries do not change. Someone selects `CONTACT_EMAIL` and gets either the real value or a masked one, decided at query time by their role.\n\nThe policy already exists in this account. It was created for you and deliberately **not attached to anything**, because attaching it is your job."
+    },
+    {
+      "type": "sql",
+      "name": "show_policy",
+      "source": "-- The policy exists. There is no INFORMATION_SCHEMA view for masking policies,\n-- so SHOW is how you find them.\nSHOW MASKING POLICIES LIKE 'EMAIL_MASK' IN SCHEMA FISERV_101_DB.GOVERNED;"
+    },
+    {
+      "type": "sql",
+      "name": "policy_body",
+      "source": "-- Read what it actually does before you attach it. Never attach a policy you\n-- have not read: a policy that returns NULL for everyone is a silent outage.\nSELECT GET_DDL('POLICY', 'FISERV_101_DB.GOVERNED.EMAIL_MASK') AS POLICY_DEFINITION;"
+    },
+    {
+      "type": "markdown",
+      "source": "It returns the real value for `ACCOUNTADMIN` and `SYSADMIN`, and replaces everything before the `@` with `****` for everyone else. The domain survives, which is often what you want: enough to know it is a merchant address, not enough to contact anybody.\n\nNow attach it."
+    },
+    {
+      "type": "sql",
+      "name": "apply_policy",
+      "source": "-- Attach the policy to the column. This is a metadata change; it does not\n-- rewrite the table and it takes effect immediately for every query.\nALTER TABLE FISERV_101_DB.GOVERNED.MERCHANT_FEEDBACK\n  MODIFY COLUMN CONTACT_EMAIL\n  SET MASKING POLICY FISERV_101_DB.GOVERNED.EMAIL_MASK;"
+    },
+    {
+      "type": "sql",
+      "name": "still_admin",
+      "source": "-- You are still ACCOUNTADMIN, so nothing looks different yet. That is correct.\nSELECT FEEDBACK_ID, CONTACT_EMAIL\nFROM FISERV_101_DB.GOVERNED.MERCHANT_FEEDBACK\nORDER BY FEEDBACK_ID\nLIMIT 5;"
+    },
+    {
+      "type": "markdown",
+      "source": "## 3. Become someone else\n\n`FISERV_101_ANALYST` is a role that has been granted `SELECT` on this database and nothing more. It is the shape of role a reporting analyst would actually hold.\n\nSwitch to it and run the identical query."
+    },
+    {
+      "type": "sql",
+      "name": "as_analyst",
+      "source": "-- Same query, different role. Nothing about the SQL changed.\nUSE ROLE FISERV_101_ANALYST;\nSELECT FEEDBACK_ID, CONTACT_EMAIL\nFROM FISERV_101_DB.GOVERNED.MERCHANT_FEEDBACK\nORDER BY FEEDBACK_ID\nLIMIT 5;"
+    },
+    {
+      "type": "sql",
+      "name": "analyst_still_works",
+      "source": "-- The analyst has lost nothing else. Aggregates, joins and filters all still\n-- work, because only the one column is masked.\nSELECT FEEDBACK_THEME, COUNT(*) AS FEEDBACK_COUNT, ROUND(AVG(RATING), 2) AS AVG_RATING\nFROM FISERV_101_DB.GOVERNED.MERCHANT_FEEDBACK\nGROUP BY FEEDBACK_THEME\nORDER BY FEEDBACK_COUNT DESC;"
+    },
+    {
+      "type": "sql",
+      "name": "back_to_admin",
+      "source": "-- Switch back. Later cells need ACCOUNTADMIN, so do not skip this.\nUSE ROLE ACCOUNTADMIN;\nSELECT CURRENT_ROLE() AS ROLE_NOW;"
+    },
+    {
+      "type": "sql",
+      "name": "policy_refs",
+      "source": "-- Which columns is this policy attached to? Answering this for every policy is\n-- most of what a governance review consists of.\n-- POLICY_REFERENCES is a table function, not a view.\nSELECT POLICY_NAME, REF_ENTITY_NAME, REF_COLUMN_NAME, POLICY_STATUS\nFROM TABLE(FISERV_101_DB.INFORMATION_SCHEMA.POLICY_REFERENCES(\n    POLICY_NAME => 'FISERV_101_DB.GOVERNED.EMAIL_MASK'));"
+    },
+    {
+      "type": "markdown",
+      "source": "**Worth knowing:** the policy is attached to a *column*, not to a query, a view or a dashboard. Anything that reads `CONTACT_EMAIL` inherits it, including views built on top of this table, exports, and anything an AI agent queries on someone's behalf. That is the property that makes it worth doing: you cannot accidentally route around it by writing a different query.\n\n## 4. The text you have been ignoring\n\nSo far you have used `RATING` and `FEEDBACK_THEME`, both of which someone had to fill in. `FEEDBACK_TEXT` is what the merchant actually said, and until recently the only way to use it at scale was to build a classifier.\n\n**AISQL** is a set of SQL functions that call a language model on each row. They are ordinary functions: you use them in a `SELECT`, they take a column, and they return a value you can group and filter on. Three of them here:\n\n- `AI_SENTIMENT` returns how positive or negative the text is\n- `AI_CLASSIFY` sorts the text into categories you supply\n- `AI_COMPLETE` answers an arbitrary prompt\n\nThey are charged per call, so the cells below work on a **stratified sample of 42 rows** — six from each of the seven themes — not all 300. Get into that habit now rather than after a surprise.\n\nThe stratification is not incidental. `FEEDBACK_ID` runs in theme order, so taking the first 42 rows would have handed you a single theme and nothing to compare against."
+    },
+    {
+      "type": "sql",
+      "name": "sentiment",
+      "source": "-- Sentiment on a stratified sample. AI_SENTIMENT returns an object, so reach\n-- into it with a path and cast, exactly as you did with telemetry JSON in Part 2.\n-- The sample takes 6 rows PER THEME rather than the first 42 rows overall.\n-- FEEDBACK_ID happens to be ordered by theme, so a plain LIMIT 42 would have\n-- returned one theme and nothing to compare.\nCREATE OR REPLACE TABLE FISERV_101_DB.GOVERNED.FEEDBACK_SCORED AS\nWITH sampled AS (\n    SELECT FEEDBACK_ID, RATING, FEEDBACK_THEME, FEEDBACK_TEXT\n    FROM FISERV_101_DB.GOVERNED.MERCHANT_FEEDBACK\n    QUALIFY ROW_NUMBER() OVER (PARTITION BY FEEDBACK_THEME\n                               ORDER BY FEEDBACK_ID) <= 6\n)\nSELECT\n    FEEDBACK_ID,\n    RATING,\n    FEEDBACK_THEME,\n    FEEDBACK_TEXT,\n    AI_SENTIMENT(FEEDBACK_TEXT):categories[0].sentiment::VARCHAR AS SENTIMENT\nFROM sampled;"
+    },
+    {
+      "type": "sql",
+      "name": "sentiment_vs_rating",
+      "source": "-- Does the model's reading of the words agree with the star rating?\n-- If they disagree badly, one of the two is not measuring what you think.\nSELECT SENTIMENT, COUNT(*) AS FEEDBACK_COUNT, ROUND(AVG(RATING), 2) AS AVG_RATING\nFROM FISERV_101_DB.GOVERNED.FEEDBACK_SCORED\nGROUP BY SENTIMENT\nORDER BY AVG_RATING;"
+    },
+    {
+      "type": "python",
+      "name": "plot_sentiment",
+      "source": "# Average star rating per model-assigned sentiment. Bars should climb left to right.\nimport matplotlib.pyplot as plt\n\ndf = sentiment_vs_rating.copy()\ncolour_for = {\"negative\": \"#D45B90\", \"mixed\": \"#FF9F36\",\n              \"neutral\": \"#8A999E\", \"positive\": \"#29B5E8\"}\ncolours = [colour_for.get(str(s).lower(), \"#11567F\") for s in df[\"SENTIMENT\"]]\n\nfig, ax = plt.subplots(figsize=(7, 4))\nax.bar(df[\"SENTIMENT\"], df[\"AVG_RATING\"], color=colours)\nax.set_ylabel(\"Average star rating\")\nax.set_ylim(0, 5)\nax.set_title(\"Model sentiment against the rating the merchant gave\")\nfor i, r in enumerate(df.itertuples()):\n    ax.text(i, r.AVG_RATING, f\"{r.AVG_RATING}  (n={r.FEEDBACK_COUNT})\",\n            ha=\"center\", va=\"bottom\")\nax.spines[[\"top\", \"right\"]].set_visible(False)\nplt.tight_layout()\nplt.show()"
+    },
+    {
+      "type": "markdown",
+      "source": "### Checking the human labels\n\n`FEEDBACK_THEME` was assigned when the feedback was logged. Ask the model to categorise the same text independently, then compare. Where they disagree, either the model is wrong or the original label was, and both are worth knowing."
+    },
+    {
+      "type": "sql",
+      "name": "classify",
+      "source": "-- Classify the text into the SAME theme vocabulary the table already uses,\n-- then compare with the theme that was recorded at the time. Using the exact\n-- same labels matters: a different vocabulary would make every row look like a\n-- mismatch and tell you nothing.\nSELECT\n    FEEDBACK_THEME AS RECORDED_THEME,\n    AI_CLASSIFY(FEEDBACK_TEXT,\n                ['settlement_delay', 'fees_transparency', 'terminal_reliability',\n                 'support_responsiveness', 'onboarding', 'reporting',\n                 'general_positive']):labels[0]::VARCHAR AS MODEL_THEME,\n    COUNT(*) AS FEEDBACK_COUNT\nFROM FISERV_101_DB.GOVERNED.FEEDBACK_SCORED\nGROUP BY RECORDED_THEME, MODEL_THEME\nORDER BY FEEDBACK_COUNT DESC;"
+    },
+    {
+      "type": "markdown",
+      "source": "Read that as a confusion matrix. Rows where `RECORDED_THEME` and `MODEL_THEME` match are agreement, and you should get agreement on roughly three quarters of them.\n\nLook at the mismatches, and in particular at what happened to `general_positive`. Several of those were classified as `terminal_reliability` instead. Both labels are defensible: the merchant was being positive *about their terminals*. The recorded vocabulary mixes two different axes — six topics and one sentiment — so a comment that is positive about a topic can only be filed under one of them.\n\nThat is not a model error. It is a schema problem the model exposed, and it would have stayed invisible if you had only ever counted the recorded themes."
+    },
+    {
+      "type": "markdown",
+      "source": "### One more: ask a question in English"
+    },
+    {
+      "type": "sql",
+      "name": "summarise",
+      "source": "-- AI_COMPLETE over concatenated feedback. LISTAGG builds one prompt from many\n-- rows, so this is a single model call rather than 40.\nSELECT AI_COMPLETE('claude-sonnet-4-5',\n    'You are reviewing merchant feedback for a payments acquirer. '\n    || 'Below are verbatim comments. In no more than four sentences, British English, '\n    || 'state the single most costly operational problem these merchants describe '\n    || 'and the evidence for it. Do not list every complaint.\\n\\n'\n    || LISTAGG(FEEDBACK_TEXT, '\\n---\\n')\n) AS ANALYSIS\nFROM FISERV_101_DB.GOVERNED.FEEDBACK_SCORED\nWHERE SENTIMENT = 'negative';"
+    },
+    {
+      "type": "handoff",
+      "source": "## Hand-off — Cortex Playground\n\n**Why:** the cell above committed to a model and a prompt before you knew either was any good. **Cortex Playground** lets you try prompts and compare models side by side against your own data, then take the version that worked back into SQL. It is a UI feature.\n\n**Steps**\n\n1. In Snowsight, go to **AI & ML → Studio**, then open **Cortex Playground**.\n2. Pick `claude-sonnet-4-5` in the left model slot and a different model in the right slot.\n3. Paste this prompt into both:\n\n   > You are reviewing merchant feedback for a payments acquirer. Identify the single most costly operational problem and the evidence for it, in no more than four sentences, British English.\n\n4. Attach some of your own data as context, choosing `FISERV_101_DB.GOVERNED.FEEDBACK_SCORED`.\n5. Run both and compare the answers.\n6. Now change one word in the prompt: replace **costly** with **frequent**, and run again.\n\n**What you should see:** the two models produce different emphases from identical input, and the costly-versus-frequent change moves the answer more than swapping the model did. The most frequent complaint and the most expensive one are not the same complaint, and the prompt is what decides which you get told about.\n\n**Docs:** https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-playground\n\n**Return here** when you have compared both models and both prompts."
+    },
+    {
+      "type": "markdown",
+      "source": "## What you did\n\n- Found personal data in the clear and read a **masking policy** before attaching it\n- Attached the policy to a column, then proved it by switching to `FISERV_101_ANALYST` and running the same SQL\n- Confirmed the analyst lost only that one column, not the ability to work\n- Listed what the policy is attached to with `POLICY_REFERENCES`\n- Used **AI_SENTIMENT**, **AI_CLASSIFY** and **AI_COMPLETE** as ordinary SQL functions on a controlled sample\n- Compared the model's themes against the recorded ones, and treated disagreement as a question rather than an error\n- Compared two models and two prompts in **Cortex Playground**\n\n## Where this goes\n\nTomorrow you build the whole thing end to end: a governed pipeline over 30 million rows, a semantic model so questions can be asked in English, and an agent that answers them and gets marked on whether it was right.\n\nThe row access policy you will meet in session 5 is the same idea as today's masking policy, applied to whole rows instead of one column, and it is the reason the agent gives two different people two different correct answers."
+    }
+  ]
+}

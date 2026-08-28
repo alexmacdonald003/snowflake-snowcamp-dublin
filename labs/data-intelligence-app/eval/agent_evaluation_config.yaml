@@ -1,0 +1,20 @@
+# No `dataset:` block on purpose. PAYMENTS_EVALSET was created once via
+# SYSTEM$CREATE_EVALUATION_DATASET; leaving `dataset:` here would make Snowflake try to
+# recreate it on every run and fail on the second one.
+evaluation:
+  agent_params:
+    agent_name: "FISERV_PAYMENTS_DB.SEMANTIC.FISERV_PAYMENTS_AGENT"
+    agent_type: "CORTEX AGENT"
+  run_params:
+    label: "Fiserv payments agent baseline"
+    description: "Seven questions, ground truth derived by query. Q2 and Q6 are traps."
+  source_metadata:
+    type: "dataset"
+    dataset_name: "FISERV_PAYMENTS_DB.SEMANTIC.PAYMENTS_EVALSET_V3"
+
+metrics:
+  - name: "answer_correctness"
+    version: "v3"
+  - name: "logical_consistency"
+    version: "v3"
+  - "tool_selection_accuracy"

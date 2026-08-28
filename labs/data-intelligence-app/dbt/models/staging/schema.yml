@@ -1,0 +1,56 @@
+version: 2
+
+sources:
+  - name: raw
+    database: FISERV_PAYMENTS_DB
+    schema: RAW
+    tables:
+      - name: MERCHANTS
+      - name: AUTHORISATIONS
+      - name: FEE_LINES
+      - name: PAYMENT_PRODUCTS
+
+models:
+  - name: stg_merchants
+    description: One row per merchant, cleaned and typed.
+    columns:
+      - name: merchant_id
+        tests: [unique, not_null]
+      - name: merchant_segment
+        tests:
+          - accepted_values:
+              values: ['Enterprise', 'Mid-Market', 'SMB']
+
+  - name: stg_authorisations
+    description: One row per authorisation attempt. Includes declines and referrals.
+    columns:
+      - name: auth_id
+        tests: [unique, not_null]
+      - name: merchant_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_merchants')
+              field: merchant_id
+      - name: auth_result
+        tests:
+          - accepted_values:
+              values: ['Approved', 'Declined', 'Referred']
+
+  - name: stg_fee_lines
+    description: >
+      Fee components. Roughly three lines per approved authorisation, so this table
+      fans out against authorisations. Never join it to authorisations and then sum
+      an authorisation column.
+    columns:
+      - name: fee_line_id
+        tests: [unique, not_null]
+      # Deliberately NOT tested for not_null: FEE_TYPE carries 152 planted NULLs and
+      # the session-4 exercise is to discover them. Adding the test here would give
+      # the answer away before attendees look.
+      - name: fee_type
+
+  - name: stg_payment_products
+    columns:
+      - name: product_id
+        tests: [unique, not_null]
