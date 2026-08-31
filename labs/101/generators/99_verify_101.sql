@@ -25,12 +25,13 @@ CREATE OR REPLACE TEMPORARY TABLE FISERV_101_DB.PUBLIC.VERIFY_RESULTS (
 
 -- Warehouses and roles are account-level, so INFORMATION_SCHEMA cannot see them.
 -- SHOW then RESULT_SCAN of the immediately preceding statement gives the same shape.
--- Part 1 compares a cold X-Small against a cold Small, so losing FISERV_101_BIG_WH
--- silently removes the point of the whole first module.
+-- Part 1 compares a cold X-Small against a cold Small on a warehouse that has never
+-- run anything, so all three of FISERV_101_WH, FISERV_101_BIG_WH and
+-- FISERV_101_TIMING_WH have to exist or the first module loses its point.
 SHOW WAREHOUSES LIKE 'FISERV_101%';
 INSERT INTO FISERV_101_DB.PUBLIC.VERIFY_RESULTS
-SELECT 'WAREHOUSES FISERV_101_WH + FISERV_101_BIG_WH', COUNT(*), 2,
-       IFF(COUNT(*) = 2, 'PASS', 'FAIL')
+SELECT 'WAREHOUSES FISERV_101_WH + BIG_WH + TIMING_WH', COUNT(*), 3,
+       IFF(COUNT(*) = 3, 'PASS', 'FAIL')
 FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()));
 
 SHOW ROLES LIKE 'FISERV_101_ANALYST';

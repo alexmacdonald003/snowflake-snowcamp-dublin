@@ -1,6 +1,7 @@
 -- Fiserv Snowcamp Workshop: day-one 101 provisioning.
 --
--- ONE STATEMENT for the attendee. Paste this into a Snowsight worksheet and run it:
+-- ONE STATEMENT for the attendee. Paste this into a Snowsight SQL file (Projects,
+-- Workspaces, +, SQL File) and run it:
 --
 --     EXECUTE IMMEDIATE FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/101/generators/00_setup_all_101.sql;
 --

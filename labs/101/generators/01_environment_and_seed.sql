@@ -30,6 +30,15 @@ CREATE WAREHOUSE IF NOT EXISTS FISERV_101_BIG_WH
   WAREHOUSE_SIZE = SMALL AUTO_SUSPEND = 60 AUTO_RESUME = TRUE INITIALLY_SUSPENDED = TRUE
   COMMENT = 'Session 1 comparison warehouse. One size up, so the difference is visible but the cost is obvious.';
 
+-- The timed comparison in session 1 needs a warehouse that has never run anything, or
+-- run 1 is not really a cold run. FISERV_101_WH cannot serve that purpose because the
+-- exploration cells before the exercise already use it. AUTO_SUSPEND is 600 rather than
+-- 60 so the local cache survives however long an attendee spends reading between the
+-- three runs; at 60 seconds the cache can vanish mid-exercise and the comparison breaks.
+CREATE WAREHOUSE IF NOT EXISTS FISERV_101_TIMING_WH
+  WAREHOUSE_SIZE = XSMALL AUTO_SUSPEND = 600 AUTO_RESUME = TRUE INITIALLY_SUSPENDED = TRUE
+  COMMENT = 'Session 1 timed comparison only. Left untouched until the first timed run so it starts cold.';
+
 USE SCHEMA RAW;
 USE WAREHOUSE FISERV_101_WH;
 

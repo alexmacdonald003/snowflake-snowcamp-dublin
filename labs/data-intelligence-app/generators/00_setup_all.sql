@@ -1,6 +1,7 @@
 -- Fiserv Snowcamp Workshop: day-one provisioning.
 --
--- ONE STATEMENT for the attendee. Paste this into a Snowsight worksheet and run it:
+-- ONE STATEMENT for the attendee. Paste this into a Snowsight SQL file (Projects,
+-- Workspaces, +, SQL File) and run it:
 --
 --     EXECUTE IMMEDIATE FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/data-intelligence-app/generators/00_setup_all.sql;
 --
