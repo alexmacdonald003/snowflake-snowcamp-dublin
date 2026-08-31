@@ -15,7 +15,7 @@
     },
     {
       "type": "markdown",
-      "source": "Expect **11 rows, every one PASS**. They arrive as a single table: nine data and schema\nchecks, the warehouse check, and the role check.\n\nThe warehouse check matters more than it looks. It expects three warehouses, because module 1\ncompares a cold X-Small against a cold Small and needs a third that has run nothing at all.\nLose any of them and the first exercise has nothing to compare."
+      "source": "Expect **7 rows, every one PASS**. They arrive as a single table: the three seeded tables,\nthe schemas, the stages, the warehouses and the role.\n\nThese are the things *setup* built. Objects you build yourself during the labs are not\nchecked here, because they do not exist yet.\n\nThe warehouse check matters more than it looks. It expects three warehouses, because module 1\ncompares a cold X-Small against a cold Small and needs a third that has run nothing at all.\nLose any of them and the first exercise has nothing to compare."
     },
     {
       "type": "sql",

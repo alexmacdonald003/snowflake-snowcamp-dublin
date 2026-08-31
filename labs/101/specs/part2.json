@@ -6,7 +6,7 @@
     },
     {
       "type": "markdown",
-      "source": "## 0. Check your account is ready\n\nSame eleven checks as the previous notebook. Thirty seconds now beats discovering a\nmissing table halfway through an exercise."
+      "source": "## 0. Check your account is ready\n\nThe same seven setup checks as the previous notebook. Half a minute now beats discovering a\nmissing table halfway through an exercise."
     },
     {
       "type": "sql",

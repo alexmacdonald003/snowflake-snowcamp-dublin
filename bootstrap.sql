@@ -90,7 +90,7 @@ SHOW COMPUTE POOLS LIKE 'SYSTEM_COMPUTE_POOL_CPU';
 -- ---------------------------------------------------------------------------------------
 -- This is the last statement, so its result is the one left on screen.
 --
--- Expect 11 rows and every STATUS to say PASS. FAIL rows sort to the top, so if the first
+-- Expect 7 rows and every STATUS to say PASS. FAIL rows sort to the top, so if the first
 -- row says PASS you are ready. If anything says FAIL, tell your facilitator the CHECK_NAME
 -- rather than trying to fix it. Do not start the lab on a broken account.
 --
@@ -108,7 +108,7 @@ EXECUTE IMMEDIATE FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/101/gene
 --
 -- It will ask you to connect to a notebook service. Accept the defaults, set the idle
 -- timeout to 15 minutes, and give it a minute or two to start. The notebook re-runs the
--- same 11 checks as its first cell, then goes straight into the first exercise.
+-- same 7 checks as its first cell, then goes straight into the first exercise.
 --
 -- PICKING UP CORRECTIONS DURING THE DAY
 -- If a facilitator fixes something in the repo, run these two lines again. The second one
