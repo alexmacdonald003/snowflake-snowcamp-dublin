@@ -38,3 +38,8 @@ LS @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/;
 --     EXECUTE IMMEDIATE FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/101/generators/00_setup_all_101.sql;
 --
 -- If it returned nothing, or errored, tell your facilitator before going further.
+--
+-- The day two lab guide is a web page, not a notebook. Open it in a browser tab and keep it
+-- beside Snowsight:
+--
+--     https://alexmacdonald003.github.io/snowflake-snowcamp-dublin/labs/data-intelligence-app/guide/fiserv_workshop_day2.html

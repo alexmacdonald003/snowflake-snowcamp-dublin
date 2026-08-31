@@ -3,6 +3,9 @@
 Hands-on lab material for a two-day Snowflake workshop. Everything here runs in a browser
 against your own Snowflake account. There is nothing to install.
 
+**Day 2 lab guide:**
+https://alexmacdonald003.github.io/snowflake-snowcamp-dublin/labs/data-intelligence-app/guide/fiserv_workshop_day2.html
+
 ## Start here
 
 1. Open a Snowsight worksheet on your workshop account.
@@ -32,9 +35,16 @@ work in the background: it builds day two's data, which takes about six minutes,
 it now means you are not waiting tomorrow morning.
 
 **Day two — building and governing an AI data application**, two sessions in one guide:
-`labs/data-intelligence-app/guide/fiserv_workshop_day2.html`. Download it and open it in your
-browser. It covers dynamic table pipelines, dbt, data quality monitoring, Gen2 warehouses,
+
+### [Open the day 2 lab guide](https://alexmacdonald003.github.io/snowflake-snowcamp-dublin/labs/data-intelligence-app/guide/fiserv_workshop_day2.html)
+
+It covers dynamic table pipelines, dbt, data quality monitoring, Gen2 warehouses,
 interactive tables, Cortex Agents, row-level security, agent evaluation and observability.
+
+If the venue wifi lets you down, the guide works offline too: open
+`labs/data-intelligence-app/guide/fiserv_workshop_day2.html` in this repo, choose **Download
+raw file**, and open it from your Downloads folder. It has no external dependencies, so it
+renders with no network at all.
 
 There is a clearly marked stopping point partway through where session four ends. Do not
 carry on past it until after the break.
