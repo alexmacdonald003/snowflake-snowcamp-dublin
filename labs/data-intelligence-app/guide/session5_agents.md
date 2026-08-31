@@ -265,7 +265,7 @@ most people expect.
 
 **Prompt CoCo:**
 
-> Build me a Streamlit app in this workspace with two tabs. First tab: a dashboard of processed volume and approval rate by month and region, from the semantic view. Second tab: a chat box that talks to FISERV_PAYMENTS_AGENT.
+> Build me a Streamlit app in this account with two tabs. First tab: a dashboard of processed volume and approval rate by month and region, from the semantic view. Second tab: a chat box that talks to FISERV_PAYMENTS_AGENT.
 
 > Make the August dip obvious on the dashboard without me having to hunt for it.
 

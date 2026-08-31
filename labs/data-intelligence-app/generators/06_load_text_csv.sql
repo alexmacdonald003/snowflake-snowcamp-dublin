@@ -48,13 +48,27 @@ CREATE OR REPLACE TABLE SUPPORT_CASES (
     CASE_TEXT     VARCHAR
 );
 
+-- COPY INTO <table> cannot read from a git repository stage: Snowflake rejects it with
+-- "Unsupported feature 'Copy into table from Git Repository'". COPY FILES *can* read from one,
+-- and the documented target is an internal named stage, so stage the CSVs first and load from
+-- there. Two statements instead of one, and no PUT from a client, which matters because
+-- attendees only have a browser.
+CREATE STAGE IF NOT EXISTS FISERV_SETUP.PUBLIC.TEXT_CSV
+  DIRECTORY = (ENABLE = TRUE)
+  COMMENT = 'Landing stage for the text corpora, copied from the git repository clone.';
+
+COPY FILES
+  INTO @FISERV_SETUP.PUBLIC.TEXT_CSV/
+  FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/data/
+  FILES = ('merchant_feedback.csv', 'support_cases.csv');
+
 COPY INTO MERCHANT_FEEDBACK
-  FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/data/merchant_feedback.csv
+  FROM @FISERV_SETUP.PUBLIC.TEXT_CSV/merchant_feedback.csv
   FILE_FORMAT = CSV_IMPORT
   ON_ERROR = ABORT_STATEMENT;
 
 COPY INTO SUPPORT_CASES
-  FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/data/support_cases.csv
+  FROM @FISERV_SETUP.PUBLIC.TEXT_CSV/support_cases.csv
   FILE_FORMAT = CSV_IMPORT
   ON_ERROR = ABORT_STATEMENT;
 

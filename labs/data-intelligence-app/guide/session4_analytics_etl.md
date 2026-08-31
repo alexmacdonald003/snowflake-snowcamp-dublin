@@ -75,7 +75,7 @@ four definitions that are easy to get wrong.
 
 **Prompt CoCo:**
 
-> Run the verification script at generators/99_verify_setup.sql and show me any row that does not say PASS.
+> Run this and show me any row that does not say PASS: EXECUTE IMMEDIATE FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/data-intelligence-app/generators/99_verify_setup.sql
 
 Or run the SQL directly:
 
@@ -416,7 +416,7 @@ failing test is a build signal rather than something you discover in a dashboard
 
 **Prompt CoCo:**
 
-> There is a dbt project in this workspace. Explain its structure: what the staging models do, what the analytics models do, and what the tests check.
+> There is a dbt project object in FISERV_PAYMENTS_DB.DBT_STAGING. Explain its structure: what the staging models do, what the analytics models do, and what the tests check.
 
 Then run it:
 
