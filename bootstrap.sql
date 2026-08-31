@@ -50,40 +50,43 @@ CREATE WAREHOUSE IF NOT EXISTS SNOWCAMP_NB_WH
 
 CREATE SCHEMA IF NOT EXISTS FISERV_SETUP.NOTEBOOKS;
 
--- Day one, three sessions. Start with SNOWFLAKE_101_PART1.
-CREATE OR REPLACE NOTEBOOK FISERV_SETUP.NOTEBOOKS.SNOWFLAKE_101_PART1
+-- Names are prefixed S1 to S5 to match the session numbers on the agenda, so the Notebooks
+-- list sorts into the order you will actually work through them.
+--
+-- Day one, sessions 1 to 3.
+CREATE OR REPLACE NOTEBOOK FISERV_SETUP.NOTEBOOKS.S1_SNOWFLAKE_101_PART1
   FROM '@FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/101/notebooks/'
   MAIN_FILE = '101_part1.ipynb'
   QUERY_WAREHOUSE = SNOWCAMP_NB_WH;
 
-CREATE OR REPLACE NOTEBOOK FISERV_SETUP.NOTEBOOKS.SNOWFLAKE_101_PART2
+CREATE OR REPLACE NOTEBOOK FISERV_SETUP.NOTEBOOKS.S2_SNOWFLAKE_101_PART2
   FROM '@FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/101/notebooks/'
   MAIN_FILE = '101_part2.ipynb'
   QUERY_WAREHOUSE = SNOWCAMP_NB_WH;
 
-CREATE OR REPLACE NOTEBOOK FISERV_SETUP.NOTEBOOKS.SNOWFLAKE_101_PART3
+CREATE OR REPLACE NOTEBOOK FISERV_SETUP.NOTEBOOKS.S3_SNOWFLAKE_101_PART3
   FROM '@FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/101/notebooks/'
   MAIN_FILE = '101_part3.ipynb'
   QUERY_WAREHOUSE = SNOWCAMP_NB_WH;
 
 -- Day two as notebooks. The web guide is the primary way to follow day two; these are here
 -- for anyone who would rather stay inside Snowsight.
-CREATE OR REPLACE NOTEBOOK FISERV_SETUP.NOTEBOOKS.DAY2_SESSION4
+CREATE OR REPLACE NOTEBOOK FISERV_SETUP.NOTEBOOKS.S4_ANALYTICS_ETL
   FROM '@FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/data-intelligence-app/notebooks/'
   MAIN_FILE = 'day2_session4.ipynb'
   QUERY_WAREHOUSE = SNOWCAMP_NB_WH;
 
-CREATE OR REPLACE NOTEBOOK FISERV_SETUP.NOTEBOOKS.DAY2_SESSION5
+CREATE OR REPLACE NOTEBOOK FISERV_SETUP.NOTEBOOKS.S5_AGENTS
   FROM '@FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/data-intelligence-app/notebooks/'
   MAIN_FILE = 'day2_session5.ipynb'
   QUERY_WAREHOUSE = SNOWCAMP_NB_WH;
 
 -- A notebook needs a live version before it can be run.
-ALTER NOTEBOOK FISERV_SETUP.NOTEBOOKS.SNOWFLAKE_101_PART1 ADD LIVE VERSION FROM LAST;
-ALTER NOTEBOOK FISERV_SETUP.NOTEBOOKS.SNOWFLAKE_101_PART2 ADD LIVE VERSION FROM LAST;
-ALTER NOTEBOOK FISERV_SETUP.NOTEBOOKS.SNOWFLAKE_101_PART3 ADD LIVE VERSION FROM LAST;
-ALTER NOTEBOOK FISERV_SETUP.NOTEBOOKS.DAY2_SESSION4 ADD LIVE VERSION FROM LAST;
-ALTER NOTEBOOK FISERV_SETUP.NOTEBOOKS.DAY2_SESSION5 ADD LIVE VERSION FROM LAST;
+ALTER NOTEBOOK FISERV_SETUP.NOTEBOOKS.S1_SNOWFLAKE_101_PART1 ADD LIVE VERSION FROM LAST;
+ALTER NOTEBOOK FISERV_SETUP.NOTEBOOKS.S2_SNOWFLAKE_101_PART2 ADD LIVE VERSION FROM LAST;
+ALTER NOTEBOOK FISERV_SETUP.NOTEBOOKS.S3_SNOWFLAKE_101_PART3 ADD LIVE VERSION FROM LAST;
+ALTER NOTEBOOK FISERV_SETUP.NOTEBOOKS.S4_ANALYTICS_ETL ADD LIVE VERSION FROM LAST;
+ALTER NOTEBOOK FISERV_SETUP.NOTEBOOKS.S5_AGENTS ADD LIVE VERSION FROM LAST;
 
 -- Five notebooks, all in FISERV_SETUP.NOTEBOOKS.
 SHOW NOTEBOOKS IN SCHEMA FISERV_SETUP.NOTEBOOKS;
@@ -91,9 +94,12 @@ SHOW NOTEBOOKS IN SCHEMA FISERV_SETUP.NOTEBOOKS;
 -- ---------------------------------------------------------------------------------------
 -- What to do next
 -- ---------------------------------------------------------------------------------------
--- Go to Projects, then Notebooks, and open SNOWFLAKE_101_PART1. Its section 0 builds your
+-- Go to Projects, then Notebooks, and open S1_SNOWFLAKE_101_PART1. Its section 0 builds your
 -- environment: run those cells and carry on from there. Everything else follows from the
 -- notebook, so this worksheet is finished.
+--
+-- If the Notebooks list looks empty, check the role selector in the top right is set to
+-- ACCOUNTADMIN. These notebooks are owned by ACCOUNTADMIN, so another role will not see them.
 --
 -- If the LS above returned nothing, or any statement errored, tell your facilitator before
 -- going further.
