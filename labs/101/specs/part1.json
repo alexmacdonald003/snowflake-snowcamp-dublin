@@ -6,26 +6,16 @@
     },
     {
       "type": "markdown",
-      "source": "## 0. Provision your account\n\nYour account is empty. You build it yourself, and it runs entirely server-side: no client,\nno CLI, no local install. `EXECUTE IMMEDIATE FROM` reads the SQL straight off an internal\nstage and executes it in your account.\n\nRun the next three cells in order, then carry on. **Start the day 2 build now even though\nyou will not touch it until tomorrow** \u2014 it takes about six minutes and finishes while the\n101 slides are running. Leaving it until tomorrow morning wastes six minutes of lab time."
-    },
-    {
-      "type": "sql",
-      "name": "provision_101",
-      "source": "-- Builds FISERV_101_DB for today's three sessions. Seconds, not minutes: the 101 data is\n-- deliberately small at 5,000 merchants and 500,000 transactions.\nEXECUTE IMMEDIATE FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/101/generators/00_setup_all_101.sql;"
-    },
-    {
-      "type": "sql",
-      "name": "provision_payments",
-      "source": "-- Builds FISERV_PAYMENTS_DB for tomorrow. Roughly six minutes: 2,000,000 merchants,\n-- 30.2 million fee lines, five dynamic tables, two Cortex Search services and a semantic\n-- view. Kick it off now and ignore it; it finishes while the slides run.\n--\n-- It deliberately does NOT build the Cortex Agent or the evaluation set. Those are the\n-- session 5 exercises, and pre-building them would hand you the answers.\nEXECUTE IMMEDIATE FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/data-intelligence-app/generators/00_setup_all.sql;"
+      "source": "## 0. Check your account is ready\n\nThe setup script you ran in a SQL file has already built everything: your databases,\nwarehouses, roles and data for both days. This cell re-runs the same checks it finished\nwith, so you know nothing has gone missing before you start.\n\nIf you have not run the setup script yet, stop and do that first. Your facilitator has\nthe link."
     },
     {
       "type": "sql",
       "name": "verify_101",
-      "source": "-- Every row must say PASS. If any row says FAIL, tell your facilitator the CHECK_NAME\n-- before trying to fix it. Do not start the lab on a broken account.\nEXECUTE IMMEDIATE FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/101/generators/99_verify_101.sql;"
+      "source": "-- Every row must say PASS. FAIL rows sort to the top, so if the first row says PASS you\n-- are ready. If any row says FAIL, tell your facilitator the CHECK_NAME before trying to\n-- fix it. Do not start the lab on a broken account.\nEXECUTE IMMEDIATE FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/101/generators/99_verify_101.sql;"
     },
     {
       "type": "markdown",
-      "source": "Expect **11 PASS rows** across three result sets: nine data and schema checks, then the\nwarehouse check, then the role check.\n\nThe warehouse one matters more than it looks. Module 1 compares a cold X-Small against a\ncold Small, so if `FISERV_101_BIG_WH` is missing the whole first exercise has no second\nhalf to compare against."
+      "source": "Expect **11 rows, every one PASS**. They arrive as a single table: nine data and schema\nchecks, the warehouse check, and the role check.\n\nThe warehouse check matters more than it looks. It expects three warehouses, because module 1\ncompares a cold X-Small against a cold Small and needs a third that has run nothing at all.\nLose any of them and the first exercise has nothing to compare."
     },
     {
       "type": "sql",

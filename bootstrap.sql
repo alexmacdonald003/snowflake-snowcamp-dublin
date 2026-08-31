@@ -8,10 +8,13 @@
 -- Workspaces is the SQL editor now.
 --
 -- WHAT IT DOES
--- Creates the two objects that let Snowflake read this public GitHub repo directly, then
--- fetches it. You will point a Workspace at the same repo in a moment; the objects here are
--- what the setup scripts run from. Because the repo is public there is no secret, no token and no password:
--- Snowflake reads it anonymously over HTTPS.
+-- Wires your account up to this public GitHub repo, copies the lab files into a Workspace,
+-- then builds both days' data. Because the repo is public there is no secret, no token and
+-- no password: Snowflake reads it anonymously over HTTPS.
+--
+-- IT TAKES ABOUT SEVEN MINUTES, almost all of it building tomorrow's data. Start it as soon
+-- as you sit down and leave it running; it finishes while the opening slides are on. You do
+-- not need to watch it.
 --
 -- You need ACCOUNTADMIN, which you have on your workshop account.
 
@@ -38,6 +41,39 @@ ALTER GIT REPOSITORY FISERV_SETUP.PUBLIC.WORKSHOP FETCH;
 -- Prove it worked. You should see the lab directories listed.
 LS @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/;
 -- ---------------------------------------------------------------------------------------
+-- Put the lab files in a Workspace
+-- ---------------------------------------------------------------------------------------
+-- This copies the whole repo into a Workspace of your own, so the notebooks appear under
+-- Projects, Workspaces with nothing further to set up. USER$ is your personal database,
+-- which Snowflake creates for you the first time you open Workspaces.
+CREATE OR REPLACE WORKSPACE USER$.PUBLIC.SNOWCAMP_DUBLIN
+  FROM '@FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/';
+
+-- A live version is what makes the files editable.
+ALTER WORKSPACE USER$.PUBLIC.SNOWCAMP_DUBLIN ADD LIVE VERSION FROM LAST;
+
+-- You should see the three day-one notebooks among the files.
+LIST 'snow://workspace/USER$.PUBLIC.SNOWCAMP_DUBLIN/versions/head/labs/101/notebooks/';
+
+-- ---------------------------------------------------------------------------------------
+-- Build the data
+-- ---------------------------------------------------------------------------------------
+-- Everything from here runs server-side: no client, no CLI, no local install.
+-- EXECUTE IMMEDIATE FROM reads the SQL straight off the repo and runs it in your account.
+--
+-- Day one first, because it is quick. 5,000 merchants and 500,000 transactions, seconds
+-- rather than minutes.
+EXECUTE IMMEDIATE FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/101/generators/00_setup_all_101.sql;
+
+-- Then day two, which is the slow one: roughly six minutes for 2,000,000 merchants,
+-- 30.2 million fee lines, five dynamic tables, two Cortex Search services and a semantic
+-- view. It builds on a LARGE warehouse that suspends itself when it finishes.
+--
+-- It deliberately does NOT build the Cortex Agent or the evaluation set. Those are the
+-- session 5 exercises, and pre-building them would hand you the answers.
+EXECUTE IMMEDIATE FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/data-intelligence-app/generators/00_setup_all.sql;
+
+-- ---------------------------------------------------------------------------------------
 -- Keep notebook sessions short
 -- ---------------------------------------------------------------------------------------
 -- Notebooks run on a Snowflake-managed notebook service, and each service holds a compute
@@ -50,38 +86,51 @@ ALTER ACCOUNT SET NOTEBOOK_VNEXT_IDLE_TIMEOUT_OPTIONS_MINUTES = '15,30,60';
 SHOW COMPUTE POOLS LIKE 'SYSTEM_COMPUTE_POOL_CPU';
 
 -- ---------------------------------------------------------------------------------------
--- WHAT TO DO NEXT: connect a Workspace to the repo
+-- Check it worked
 -- ---------------------------------------------------------------------------------------
--- The lab notebooks live in the repo you just fetched. To open and run them you need a
--- Workspace connected to that repo. This part is done in the UI; there is no SQL for it.
+-- This is the last statement, so its result is the one left on screen.
 --
---   1. In the left nav choose Projects, then Workspaces.
---   2. In the Workspaces menu choose From Git repository.
---   3. Repository URL:
+-- Expect 11 rows and every STATUS to say PASS. FAIL rows sort to the top, so if the first
+-- row says PASS you are ready. If anything says FAIL, tell your facilitator the CHECK_NAME
+-- rather than trying to fix it. Do not start the lab on a broken account.
 --
---          https://github.com/alexmacdonald003/snowflake-snowcamp-dublin
---
---   4. API integration: choose SNOWCAMP_GIT_API, created above.
---   5. Authentication: choose Public repository. There is no username, token or password
---      to enter. You will not be able to push changes back, which is intended.
---   6. Choose Create.
---
--- You now have the whole repo as a file tree. Open:
+-- This checks day one only. Day two has its own 20-check verification, and the day two lab
+-- guide runs it as its first step.
+EXECUTE IMMEDIATE FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/101/generators/99_verify_101.sql;
+
+-- ---------------------------------------------------------------------------------------
+-- WHAT TO DO NEXT
+-- ---------------------------------------------------------------------------------------
+-- Everything is in place. In the left nav choose Projects, then Workspaces, and open the
+-- SNOWCAMP_DUBLIN workspace. Then open:
 --
 --     labs/101/notebooks/101_part1.ipynb
 --
 -- It will ask you to connect to a notebook service. Accept the defaults, set the idle
--- timeout to 15 minutes, and give it a minute or two to start. Then run section 0, which
--- builds your databases, warehouses and data, and finishes with 11 checks that should all
--- say PASS.
+-- timeout to 15 minutes, and give it a minute or two to start. The notebook re-runs the
+-- same 11 checks as its first cell, then goes straight into the first exercise.
+--
+-- PICKING UP CORRECTIONS DURING THE DAY
+-- If a facilitator fixes something in the repo, run these two lines again. The second one
+-- discards any edits you have made to the lab files, which is usually what you want:
+--
+--     ALTER GIT REPOSITORY FISERV_SETUP.PUBLIC.WORKSHOP FETCH;
+--     CREATE OR REPLACE WORKSPACE USER$.PUBLIC.SNOWCAMP_DUBLIN
+--       FROM '@FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/';
+--     ALTER WORKSPACE USER$.PUBLIC.SNOWCAMP_DUBLIN ADD LIVE VERSION FROM LAST;
+--
+-- Note this workspace is a copy of the repo, not a live Git connection, so there is no
+-- Pull button and no pushing back. Re-running the three lines above is the way to refresh.
 --
 -- TROUBLESHOOTING
--- Empty file tree, or the repo will not connect: check the role selector in the top right
--- is ACCOUNTADMIN. The API integration above is owned by ACCOUNTADMIN and another role
--- cannot see it.
+-- If any statement above failed, check the role selector in the top right is ACCOUNTADMIN,
+-- then tell your facilitator before going further.
 --
--- If the LS above returned nothing, or any statement errored, tell your facilitator before
--- going further.
+-- If you would rather connect a real Git-synced workspace, you can: Projects, Workspaces,
+-- From Git repository, paste the URL below, choose SNOWCAMP_GIT_API as the API integration
+-- and pick the "Public repository" option so no credentials are needed.
+--
+--     https://github.com/alexmacdonald003/snowflake-snowcamp-dublin
 --
 -- DAY TWO is a web page rather than a notebook. Open it in a browser tab and keep it beside
 -- Snowsight:

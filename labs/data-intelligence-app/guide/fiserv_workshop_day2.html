@@ -313,8 +313,8 @@ footer { max-width: 880px; margin: 60px auto 0; color: var(--muted); font-size: 
 <h2 class="section" id="table-of-contents"><span class="num">&nbsp;</span>Table of Contents</h2>
 <ol class="toc-body"><li><a href="#setup">Setup</a></li><li><a href="#explore-your-data">Explore Your Data</a></li><li><a href="#data-quality">Data Quality</a></li><li><a href="#dynamic-tables-pipeline">Dynamic Tables Pipeline</a></li><li><a href="#dbt-analytics">dbt Analytics</a></li><li><a href="#gen2-warehouse-optima-indexing">Gen2 Warehouse: Optima Indexing</a></li><li><a href="#interactive-tables">Interactive Tables</a></li><li><a href="#coco-custom-skill">CoCo Custom Skill</a></li></ol><p class="takeaway"><strong>Session 4 ends here.</strong> Everything below is session 5, after the break.</p><ol class="toc-body" start="9"><li><a href="#snowflake-cowork">Snowflake CoWork</a></li><li><a href="#security-and-governance">Security and Governance</a></li><li><a href="#streamlit-dashboard">Streamlit Dashboard</a></li><li><a href="#agent-evaluation">Agent Evaluation</a></li><li><a href="#agent-observability">Agent Observability</a></li><li><a href="#optional-mcp-server">Optional: MCP Server</a></li><li><a href="#cleanup">Cleanup</a></li><li><a href="#troubleshooting">Troubleshooting</a></li><li><a href="#conclusion">Conclusion</a></li></ol>
 <h2 class="section" id="setup"><span class="num">1</span>Setup</h2>
-<p>Your account was provisioned yesterday while the 101 slides were running, so there is nothing to install and nothing to clone. This step confirms it worked.</p>
-<p>Open <strong>Projects → Workspaces</strong> in Snowsight and open your workspace. Confirm <code>AGENTS.md</code> is present. CoCo reads it automatically, so it already knows the payments schemas and the four definitions that are easy to get wrong.</p>
+<p>Your account was provisioned on day one by the setup script, while the 101 slides were running, so there is nothing to install and nothing to clone. This step confirms it worked.</p>
+<p>Open <strong>Projects → Workspaces</strong> in Snowsight and open your <code>SNOWCAMP_DUBLIN</code> workspace. Confirm <code>labs/data-intelligence-app/AGENTS.md</code> is present. CoCo reads it automatically, so it already knows the payments schemas and the four definitions that are easy to get wrong.</p>
 <p><strong>Prompt CoCo:</strong></p>
 <div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p1" type="button">Copy</button></div><div class="prompt-body" id="p1">Run this and show me any row that does not say PASS: EXECUTE IMMEDIATE FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/data-intelligence-app/generators/99_verify_setup.sql</div></div>
 <p>Or run the SQL directly:</p>
@@ -326,7 +326,7 @@ footer { max-width: 880px; margin: 60px auto 0; color: var(--muted); font-size: 
 <span class="t-kw">USE</span> <span class="t-kw">SCHEMA</span> RAW;
 <span class="t-kw">USE</span> <span class="t-kw">WAREHOUSE</span> FISERV_WH;</code></pre></div>
 <h4 id="verify-your-account">Verify Your Account</h4>
-<p>Your account was provisioned before the workshop. <strong>Run this before anything else.</strong> It is the difference between finding a problem now and finding it at 09:30 with the room ahead of you.</p>
+<p>Your account was provisioned on day one. <strong>Run this before anything else.</strong> It is the difference between finding a problem now and finding it at 09:30 with the room ahead of you.</p>
 <div class="code-card"><div class="code-head"><span class="code-lang">sql</span><button class="copy" data-copy="c3" type="button">Copy</button></div><pre id="c3"><code><span class="t-comment">-- Every row must say PASS. Run this first, every session.</span>
 EXECUTE IMMEDIATE <span class="t-kw">FROM</span>
   @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/data-intelligence-app/generators/99_verify_setup.sql;</code></pre></div>

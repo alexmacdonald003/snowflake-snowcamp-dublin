@@ -5,6 +5,15 @@
       "source": "# Snowflake 101 \u2014 Part 3\n\n## Who can see what, and what the text is telling you\n\nTwo topics that look unrelated and are not. Both are about data you hold but should not treat casually: personal information you must restrict, and free text you have been throwing away.\n\nThe data is 300 pieces of merchant feedback, each with a rating, a stated theme, the merchant's own words, and a contact email address.\n\nBy the end you will have:\n\n1. Found personal data sitting in the clear\n2. Masked it without changing the table or any query that reads it\n3. Proved the mask works by becoming a different role\n4. Made Snowflake read all 300 pieces of feedback and tell you what is in them\n5. Checked whether it agreed with the themes a human assigned\n\nAllow about 40 minutes."
     },
     {
+      "type": "markdown",
+      "source": "## 0. Check your account is ready\n\nSame eleven checks as the previous notebook. Thirty seconds now beats discovering a\nmissing table halfway through an exercise."
+    },
+    {
+      "type": "sql",
+      "name": "preflight",
+      "source": "-- Every row must say PASS. FAIL rows sort to the top, so if the first row says PASS you\n-- are ready. If any row says FAIL, tell your facilitator the CHECK_NAME.\nEXECUTE IMMEDIATE FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/101/generators/99_verify_101.sql;"
+    },
+    {
       "type": "sql",
       "name": "ctx",
       "source": "-- Pins your role, database, schema and warehouse for the rest of the notebook.\nUSE ROLE ACCOUNTADMIN;\nUSE DATABASE FISERV_101_DB;\nUSE SCHEMA GOVERNED;\nUSE WAREHOUSE FISERV_101_WH;"

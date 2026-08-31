@@ -66,12 +66,12 @@ free text.
 
 ## Setup
 
-Your account was provisioned yesterday while the 101 slides were running, so there is
-nothing to install and nothing to clone. This step confirms it worked.
+Your account was provisioned on day one by the setup script, while the 101 slides were
+running, so there is nothing to install and nothing to clone. This step confirms it worked.
 
-Open **Projects → Workspaces** in Snowsight and open your workspace. Confirm `AGENTS.md`
-is present. CoCo reads it automatically, so it already knows the payments schemas and the
-four definitions that are easy to get wrong.
+Open **Projects → Workspaces** in Snowsight and open your `SNOWCAMP_DUBLIN` workspace.
+Confirm `labs/data-intelligence-app/AGENTS.md` is present. CoCo reads it automatically, so it
+already knows the payments schemas and the four definitions that are easy to get wrong.
 
 **Prompt CoCo:**
 
@@ -93,7 +93,7 @@ USE WAREHOUSE FISERV_WH;
 
 ### Verify Your Account
 
-Your account was provisioned before the workshop. **Run this before anything else.** It is
+Your account was provisioned on day one. **Run this before anything else.** It is
 the difference between finding a problem now and finding it at 09:30 with the room ahead of
 you.
 

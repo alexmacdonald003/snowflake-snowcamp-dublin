@@ -5,6 +5,15 @@
       "source": "# Snowflake 101 \u2014 Part 2\n\n## Data that arrives as files, and pipelines that maintain themselves\n\nIn Part 1 the data was already a table. That is not how it usually arrives.\n\nThis notebook works with **terminal telemetry**: what a payment terminal reports back about itself. Model, firmware version, connectivity, battery, and a list of events such as `card_read_failed` or `printer_jam`. It arrives as JSON, because that is what devices emit.\n\nBy the end you will have:\n\n1. Looked at a stage pointing outside your account, and one inside it\n2. Queried JSON without defining a schema first\n3. Turned a nested array into rows\n4. Built a pipeline that keeps itself up to date\n5. Asked Cortex Code to do a piece of the work for you\n\nAllow about 40 minutes."
     },
     {
+      "type": "markdown",
+      "source": "## 0. Check your account is ready\n\nSame eleven checks as the previous notebook. Thirty seconds now beats discovering a\nmissing table halfway through an exercise."
+    },
+    {
+      "type": "sql",
+      "name": "preflight",
+      "source": "-- Every row must say PASS. FAIL rows sort to the top, so if the first row says PASS you\n-- are ready. If any row says FAIL, tell your facilitator the CHECK_NAME.\nEXECUTE IMMEDIATE FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/101/generators/99_verify_101.sql;"
+    },
+    {
       "type": "sql",
       "name": "ctx",
       "source": "-- Pins your role, database, schema and warehouse for the rest of the notebook.\nUSE ROLE ACCOUNTADMIN;\nUSE DATABASE FISERV_101_DB;\nUSE SCHEMA RAW;\nUSE WAREHOUSE FISERV_101_WH;"
