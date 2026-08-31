@@ -42,7 +42,7 @@ against query-derived ground truth, exposed as an app, and observable in product
 4. Agent Evaluation
 5. Agent Observability
 6. Optional: MCP Server
-7. Optional: Streaming Ingestion
+7. Optional: MCP Server
 8. Cleanup and Troubleshooting
 
 ## Snowflake CoWork
@@ -484,20 +484,6 @@ expose the agent over MCP, but you cannot evaluate the MCP surface itself.
 Worth knowing before you build on it: **agent evaluations do not currently support MCP
 servers as tools.** The run completes, but no MCP tool is called, so the results say
 nothing about that path.
-
-## Optional: Streaming Ingestion
-
-**Facilitator demo.** The official quickstart streams new orders in with the Snowpipe
-Streaming SDK, which starts by generating an RSA key pair and running a Python client. That
-is not a browser activity, so it is a demonstration here rather than an exercise.
-
-**Prompt CoCo:**
-
-> Explain how Snowpipe Streaming would fit into the pipeline we built, and what it would replace.
-
-The pipeline you built already handles new data arriving: the dynamic tables refresh
-incrementally on a one-minute lag regardless of how rows land. Streaming changes how rows
-arrive, not what happens after.
 
 ## Cleanup and Troubleshooting
 

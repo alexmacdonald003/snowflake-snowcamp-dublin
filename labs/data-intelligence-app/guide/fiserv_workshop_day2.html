@@ -7,7 +7,7 @@
 <title>Fiserv SnowCamp &mdash; Day 2 Lab Guide</title>
 <script type="application/json" id="snowflake-report-metadata">
 {
-  "generated": "2026-08-28",
+  "generated": "2026-08-31",
   "intent": "Fiserv SnowCamp day 2 lab guide, mirroring the official CoCo end-to-end quickstart",
   "upstream": "https://www.snowflake.com/en/developers/guides/sfguide-build-end-to-end-ai-app-on-snowflake/",
   "sourceGuides": [
@@ -84,11 +84,6 @@
     {
       "id": "optional-mcp-server",
       "title": "Optional: MCP Server",
-      "source": "s5"
-    },
-    {
-      "id": "optional-streaming-ingestion",
-      "title": "Optional: Streaming Ingestion",
       "source": "s5"
     },
     {
@@ -294,7 +289,6 @@ footer { max-width: 880px; margin: 60px auto 0; color: var(--muted); font-size: 
 <li><a href="#agent-evaluation">Agent Evaluation</a></li>
 <li><a href="#agent-observability">Agent Observability</a></li>
 <li><a href="#optional-mcp-server">Optional: MCP Server</a></li>
-<li><a href="#optional-streaming-ingestion">Optional: Streaming Ingestion</a></li>
 <li><a href="#cleanup">Cleanup</a></li>
 <li><a href="#troubleshooting">Troubleshooting</a></li>
 <li><a href="#conclusion">Conclusion</a></li>
@@ -317,7 +311,7 @@ footer { max-width: 880px; margin: 60px auto 0; color: var(--muted); font-size: 
 <h4 id="session-5-adds">Session 5 adds</h4>
 <ul><li>Build a Cortex Agent with Cortex Analyst (semantic view plus verified queries) and Cortex Search</li><li>Write response instructions that stop the agent making three specific, expensive mistakes</li><li>Use Snowflake CoWork for conversational analysis, Deep Research, Artifacts and Automations</li><li>Implement transparent row-level security with Row Access Policies, and see the agent inherit it</li><li>Ship the agent as a Streamlit app that inherits the same governance</li><li>Evaluate agent quality with ground-truth datasets and LLM judges</li><li>Read agent observability traces: reasoning steps, tool calls and token usage</li><li>Session 4 completed. This session builds directly on it.</li><li>A browser and your Snowflake account details.</li></ul>
 <h2 class="section" id="table-of-contents"><span class="num">&nbsp;</span>Table of Contents</h2>
-<ol class="toc-body"><li><a href="#setup">Setup</a></li><li><a href="#explore-your-data">Explore Your Data</a></li><li><a href="#data-quality">Data Quality</a></li><li><a href="#dynamic-tables-pipeline">Dynamic Tables Pipeline</a></li><li><a href="#dbt-analytics">dbt Analytics</a></li><li><a href="#gen2-warehouse-optima-indexing">Gen2 Warehouse: Optima Indexing</a></li><li><a href="#interactive-tables">Interactive Tables</a></li><li><a href="#coco-custom-skill">CoCo Custom Skill</a></li></ol><p class="takeaway"><strong>Session 4 ends here.</strong> Everything below is session 5, after the break.</p><ol class="toc-body" start="9"><li><a href="#snowflake-cowork">Snowflake CoWork</a></li><li><a href="#security-and-governance">Security and Governance</a></li><li><a href="#streamlit-dashboard">Streamlit Dashboard</a></li><li><a href="#agent-evaluation">Agent Evaluation</a></li><li><a href="#agent-observability">Agent Observability</a></li><li><a href="#optional-mcp-server">Optional: MCP Server</a></li><li><a href="#optional-streaming-ingestion">Optional: Streaming Ingestion</a></li><li><a href="#cleanup">Cleanup</a></li><li><a href="#troubleshooting">Troubleshooting</a></li><li><a href="#conclusion">Conclusion</a></li></ol>
+<ol class="toc-body"><li><a href="#setup">Setup</a></li><li><a href="#explore-your-data">Explore Your Data</a></li><li><a href="#data-quality">Data Quality</a></li><li><a href="#dynamic-tables-pipeline">Dynamic Tables Pipeline</a></li><li><a href="#dbt-analytics">dbt Analytics</a></li><li><a href="#gen2-warehouse-optima-indexing">Gen2 Warehouse: Optima Indexing</a></li><li><a href="#interactive-tables">Interactive Tables</a></li><li><a href="#coco-custom-skill">CoCo Custom Skill</a></li></ol><p class="takeaway"><strong>Session 4 ends here.</strong> Everything below is session 5, after the break.</p><ol class="toc-body" start="9"><li><a href="#snowflake-cowork">Snowflake CoWork</a></li><li><a href="#security-and-governance">Security and Governance</a></li><li><a href="#streamlit-dashboard">Streamlit Dashboard</a></li><li><a href="#agent-evaluation">Agent Evaluation</a></li><li><a href="#agent-observability">Agent Observability</a></li><li><a href="#optional-mcp-server">Optional: MCP Server</a></li><li><a href="#cleanup">Cleanup</a></li><li><a href="#troubleshooting">Troubleshooting</a></li><li><a href="#conclusion">Conclusion</a></li></ol>
 <h2 class="section" id="setup"><span class="num">1</span>Setup</h2>
 <p>Your account was provisioned yesterday while the 101 slides were running, so there is nothing to install and nothing to clone. This step confirms it worked.</p>
 <p>Open <strong>Projects → Workspaces</strong> in Snowsight and open your workspace. Confirm <code>AGENTS.md</code> is present. CoCo reads it automatically, so it already knows the payments schemas and the four definitions that are easy to get wrong.</p>
@@ -776,19 +770,14 @@ why this step comes after you have used CoWork.</div></div>
 <div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p94" type="button">Copy</button></div><div class="prompt-body" id="p94">Explain what an MCP server exposes in Snowflake and what I would use one for.</div></div>
 <div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p95" type="button">Copy</button></div><div class="prompt-body" id="p95">If I exposed this agent over MCP, what governance still applies and what becomes my responsibility?</div></div>
 <p>Worth knowing before you build on it: <strong>agent evaluations do not currently support MCP servers as tools.</strong> The run completes, but no MCP tool is called, so the results say nothing about that path.</p>
-<h2 class="section" id="optional-streaming-ingestion"><span class="num">15</span>Optional: Streaming Ingestion</h2>
-<p><strong>Facilitator demo.</strong> The official quickstart streams new orders in with the Snowpipe Streaming SDK, which starts by generating an RSA key pair and running a Python client. That is not a browser activity, so it is a demonstration here rather than an exercise.</p>
-<p><strong>Prompt CoCo:</strong></p>
-<div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p96" type="button">Copy</button></div><div class="prompt-body" id="p96">Explain how Snowpipe Streaming would fit into the pipeline we built, and what it would replace.</div></div>
-<p>The pipeline you built already handles new data arriving: the dynamic tables refresh incrementally on a one-minute lag regardless of how rows land. Streaming changes how rows arrive, not what happens after.</p>
-<h2 class="section" id="cleanup"><span class="num">16</span>Cleanup</h2>
+<h2 class="section" id="cleanup"><span class="num">15</span>Cleanup</h2>
 <p>Nothing needs cleaning up. Your account is yours, and the objects are worth keeping if you want to carry on afterwards. If you do want to reset:</p>
-<div class="code-card"><div class="code-head"><span class="code-lang">sql</span><button class="copy" data-copy="c97" type="button">Copy</button></div><pre id="c97"><code><span class="t-comment">-- Suspends compute without destroying anything you built.</span>
+<div class="code-card"><div class="code-head"><span class="code-lang">sql</span><button class="copy" data-copy="c96" type="button">Copy</button></div><pre id="c96"><code><span class="t-comment">-- Suspends compute without destroying anything you built.</span>
 <span class="t-kw">ALTER</span> <span class="t-kw">WAREHOUSE</span> FISERV_WH SUSPEND;
 <span class="t-kw">ALTER</span> <span class="t-kw">WAREHOUSE</span> FISERV_GEN2_WH SUSPEND;</code></pre></div>
-<h2 class="section" id="troubleshooting"><span class="num">17</span>Troubleshooting</h2>
+<h2 class="section" id="troubleshooting"><span class="num">16</span>Troubleshooting</h2>
 <div class="table-wrap"><table><thead><tr><th>Symptom</th><th>Cause</th></tr></thead><tbody><tr><td>Error 000630 on an interactive warehouse</td><td>Five second statement timeout. Use <code>FISERV_WH</code> for anything that is not a point lookup</td></tr><tr><td>Agent reports €3.2M as revenue</td><td>Response instructions did not land. Rewrite them explicitly</td></tr><tr><td>Evaluation scores 0.0 on tool selection</td><td>Usually the expected-tool list, not the agent</td></tr><tr><td>Observability tab is empty</td><td>No real conversations yet. Evaluations do not populate it</td></tr><tr><td>A dynamic table refreshes FULL</td><td>Refresh mode was not set explicitly; Snowflake judged the query complex</td></tr></tbody></table></div>
-<h2 class="section" id="conclusion"><span class="num">18</span>Conclusion</h2>
+<h2 class="section" id="conclusion"><span class="num">17</span>Conclusion</h2>
 <p>Across two sessions you built a monitored, tested pipeline; put a governed agent on top of it; proved its answers against query-derived ground truth; found that two of your own answer keys and one of your metrics were wrong; and shipped it as an app.</p>
 <p>The recurring lesson is the one worth taking back: <strong>the failure mode in all of this is not an error message. It is a plausible number.</strong> The fan-out that triples volume, the monitor on the wrong column, the refresh mode you did not set, total fees reported as revenue, and an evaluation that fails a correct answer. None of them threw an error. Every one returned something that looked completely fine.</p>
 <footer>

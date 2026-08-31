@@ -43,7 +43,6 @@ OFFICIAL_ORDER = [
     ("s5", "Agent Evaluation"),
     ("s5", "Agent Observability"),
     ("s5", "Optional: MCP Server"),
-    ("s5", "Optional: Streaming Ingestion"),
     ("s5", "Cleanup"),
     ("s5", "Troubleshooting"),
     ("s5", "Conclusion"),
