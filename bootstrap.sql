@@ -106,8 +106,9 @@ EXECUTE IMMEDIATE FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/101/gene
 --
 --     labs/101/notebooks/101_part1.ipynb
 --
--- It will ask you to connect to a notebook service. Accept the defaults, set the idle
--- timeout to 15 minutes, and give it a minute or two to start. The notebook re-runs the
+-- It will ask you to connect to a notebook service. Accept the defaults, including the
+-- 15 minute idle timeout, which the statement above has already made the pre-selected
+-- option. Give it a minute or two to start. The notebook re-runs the
 -- same 7 checks as its first cell, then goes straight into the first exercise.
 --
 -- PICKING UP CORRECTIONS DURING THE DAY
