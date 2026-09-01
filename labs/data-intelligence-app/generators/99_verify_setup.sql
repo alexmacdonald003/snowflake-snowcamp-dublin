@@ -96,10 +96,15 @@ WITH checks AS (
     FROM INFORMATION_SCHEMA.TABLES
     WHERE TABLE_SCHEMA = 'INTERACTIVE' AND TABLE_NAME = 'STD_AUTH_LOOKUP'
     UNION ALL
-    -- POLICY_REFERENCES is a table FUNCTION, not a view.
+    -- POLICY_REFERENCES is a table FUNCTION, not a view. Query it by REF_ENTITY_NAME, not
+    -- by POLICY_NAME: the POLICY_NAME form returns zero rows here even when the policy is
+    -- demonstrably attached (ALTER TABLE ... ADD ROW ACCESS POLICY fails with 003549,
+    -- "already has a ROW_ACCESS_POLICY"). Asking the table what is attached to it works.
     SELECT 'Row access policy applied', COUNT(*)::VARCHAR, '1'
-    FROM TABLE(INFORMATION_SCHEMA.POLICY_REFERENCES(
-        POLICY_NAME => 'FISERV_PAYMENTS_DB.SEMANTIC.ACQUIRING_REGION_POLICY'))
+    FROM TABLE(FISERV_PAYMENTS_DB.INFORMATION_SCHEMA.POLICY_REFERENCES(
+        REF_ENTITY_NAME => 'FISERV_PAYMENTS_DB.RAW.MERCHANTS',
+        REF_ENTITY_DOMAIN => 'TABLE'))
+    WHERE POLICY_NAME = 'ACQUIRING_REGION_POLICY'
     UNION ALL
     -- Both search services the session-5 agent will bind to. The agent itself is NOT
     -- checked here: it does not exist yet, because building it is the session-5 exercise.
