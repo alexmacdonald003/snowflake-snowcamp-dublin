@@ -113,7 +113,10 @@ WITH checks AS (
     WHERE SERVICE_NAME IN ('MERCHANT_FEEDBACK_SEARCH', 'SUPPORT_CASE_SEARCH')
 )
 
-SELECT check_name, expected, actual,
+-- Column order is ACTUAL then EXPECTED, matching 99_verify_101.sql. Reading a FAIL row then
+-- says "got this, wanted that". The two scripts used to disagree on the order, which is an
+-- easy way to misdiagnose a failure when a room is waiting.
+SELECT check_name, actual, expected,
        IFF(actual = expected, 'PASS', 'FAIL') AS status
 FROM checks
 ORDER BY status DESC, check_name;
