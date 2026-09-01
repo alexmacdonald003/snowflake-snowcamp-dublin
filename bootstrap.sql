@@ -61,17 +61,23 @@ LIST 'snow://workspace/USER$.PUBLIC.SNOWCAMP_DUBLIN/versions/head/labs/101/noteb
 -- Everything from here runs server-side: no client, no CLI, no local install.
 -- EXECUTE IMMEDIATE FROM reads the SQL straight off the repo and runs it in your account.
 --
--- Day one first, because it is quick. 5,000 merchants and 500,000 transactions, seconds
--- rather than minutes.
-EXECUTE IMMEDIATE FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/101/generators/00_setup_all_101.sql;
-
--- Then day two, which is the slow one: roughly six minutes for 2,000,000 merchants,
--- 30.2 million fee lines, five dynamic tables, two Cortex Search services and a semantic
--- view. It builds on a LARGE warehouse that suspends itself when it finishes.
+-- ORDER MATTERS. Day two is built first even though it is the slow one, because the day one
+-- build depends on it: 03_text_and_governance.sql builds the 101 feedback table by selecting
+-- from FISERV_PAYMENTS_DB.RAW.MERCHANT_FEEDBACK, reusing the day-two corpus rather than
+-- generating a second one. Run day one first and it fails with "Database 'FISERV_PAYMENTS_DB'
+-- does not exist". There is no dependency in the other direction.
+--
+-- Day two: roughly six minutes for 2,000,000 merchants, 30.2 million fee lines, five dynamic
+-- tables, two Cortex Search services and a semantic view. It builds on a LARGE warehouse that
+-- suspends itself when it finishes.
 --
 -- It deliberately does NOT build the Cortex Agent or the evaluation set. Those are the
 -- session 5 exercises, and pre-building them would hand you the answers.
 EXECUTE IMMEDIATE FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/data-intelligence-app/generators/00_setup_all.sql;
+
+-- Day one: quick by comparison. 5,000 merchants and 500,000 transactions, seconds rather
+-- than minutes. Ends by running its own 7-check verification.
+EXECUTE IMMEDIATE FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/101/generators/00_setup_all_101.sql;
 
 -- ---------------------------------------------------------------------------------------
 -- Keep notebook sessions short
