@@ -91,6 +91,11 @@ ALTER ACCOUNT SET NOTEBOOK_VNEXT_IDLE_TIMEOUT_OPTIONS_MINUTES = '15,30,60';
 -- The notebooks need a compute pool. Confirm one is available before you go further.
 SHOW COMPUTE POOLS LIKE 'SYSTEM_COMPUTE_POOL_CPU';
 
+-- Snowflake CoWork, which you use on day two, starts your session with your DEFAULT role and
+-- DEFAULT warehouse rather than whatever you had selected in Snowsight. Setting them now saves
+-- you changing both after logging in. Omitting the user name applies this to you.
+ALTER USER SET DEFAULT_ROLE = ACCOUNTADMIN, DEFAULT_WAREHOUSE = FISERV_WH;
+
 -- ---------------------------------------------------------------------------------------
 -- Check it worked
 -- ---------------------------------------------------------------------------------------

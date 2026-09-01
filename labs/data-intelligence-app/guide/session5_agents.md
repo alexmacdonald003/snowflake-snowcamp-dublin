@@ -115,11 +115,28 @@ FROM FISERV_PAYMENTS_DB.RAW.FEE_LINES;
 Correct answer: **€1,934,149.64**. If you get €3,203,738.89, your instructions did not
 land. Go back and make them explicit.
 
-### Test Agent Routing
+### Interrogate the Agent in CoWork
 
-**Prompt CoCo:**
+Everything so far has been in Snowsight. The rest of this section happens in **Snowflake CoWork**,
+which is where you talk to the agent you just built and, crucially, where you can see *which tool
+it chose and why*. That trace does not exist anywhere else.
 
-> Ask the agent which month had the lowest approval rate and what it was.
+Open it one of two ways:
+
+- Navigate to **`https://ai.snowflake.com`**, or
+- In Snowsight, go to **AI & ML → Agents**, select your agent, and choose **Preview in Snowflake CoWork**
+
+CoWork starts your session with your **default role and default warehouse**, not whatever you had
+selected in Snowsight. If the agent cannot reach anything, check those first with the pickers in
+the CoWork interface.
+
+Your agent should appear in the list automatically. Select it, then work through the three
+questions below in order. They escalate deliberately: a simple lookup, a genuine multi-tool
+investigation, then a question the agent should refuse.
+
+**Ask your agent:**
+
+> Ask which month had the lowest approval rate and what it was.
 
 **August 2025 at 88.02 percent**, against roughly 93.98 to 93.99 percent in the other
 three months.
@@ -128,7 +145,8 @@ Now the capstone question:
 
 > Approval rates dipped in August. What happened, and does the merchant-facing evidence agree?
 
-Watch which tools it reaches for. A good answer quantifies the dip from the semantic view,
+Watch which tools it reaches for in the trace. You are looking for *which* tool fired and *why*,
+not just the answer. A good answer quantifies the dip from the semantic view,
 finds that **Issuer Unavailable rose to 38.1 percent of declines from a baseline of 5.0
 percent**, and then corroborates it from support cases and merchant feedback written in
 August. The numbers and the narrative agree, and the cause turns out to be upstream of
@@ -140,12 +158,6 @@ Then ask something it should refuse:
 
 The data ends September 2025. A good agent says so. A bad one extrapolates confidently.
 
-### Open It in CoWork
-
-Open the agent in **Snowflake CoWork** and ask the August question again. Watch the tool
-routing in the trace. You are looking for *which* tool fired and *why*, not just the
-answer.
-
 ### Deep Research
 
 > **Not yet verified.** Deep Research is a CoWork interface feature with no SQL surface, so
@@ -155,14 +167,18 @@ answer.
 **Deep Research** runs a multi-step investigation rather than answering in one shot. It
 plans, gathers from several sources, and returns a report with citations.
 
-In CoWork, start a Deep Research investigation with:
+Still in CoWork, select the **+** button in the message bar and choose **Deep Research**. Then ask:
 
 > Investigate the August 2025 approval rate dip end to end. Quantify it, identify the dominant decline reason and how far it moved from baseline, check whether merchant feedback and support cases from August corroborate it, and tell me whether the cause is inside or outside Fiserv's control.
 
-Expect it to take noticeably longer than a normal question and to cite both the structured
-figures and specific pieces of free text. Compare its answer to the one you got from the
-single capstone question above: the interesting part is whether the extra steps changed the
-conclusion or only the amount of supporting evidence.
+**Investigations can take up to 10 minutes.** That is expected, not a hang. Start it, then read
+the next section while it runs rather than watching the spinner. Once the report is ready it stays
+in context for the rest of the thread, so follow-ups like "break that down by region" run as
+normal chat turns without restarting the investigation.
+
+Expect it to cite both the structured figures and specific pieces of free text. Compare its answer
+to the one you got from the single capstone question above: the interesting part is whether the
+extra steps changed the conclusion or only the amount of supporting evidence.
 
 ### Save as Artifact
 

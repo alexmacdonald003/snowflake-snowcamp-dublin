@@ -73,12 +73,6 @@ Open **Projects → Workspaces** in Snowsight and open your `SNOWCAMP_DUBLIN` wo
 Confirm `labs/data-intelligence-app/AGENTS.md` is present. CoCo reads it automatically, so it
 already knows the payments schemas and the four definitions that are easy to get wrong.
 
-**Prompt CoCo:**
-
-> Run this and show me any row that does not say PASS: EXECUTE IMMEDIATE FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/data-intelligence-app/generators/99_verify_setup.sql
-
-Or run the SQL directly:
-
 First pin your context. Every cell below depends on this, and the unqualified
 `INFORMATION_SCHEMA` calls later on resolve against whatever database is current.
 
@@ -96,6 +90,12 @@ USE WAREHOUSE FISERV_WH;
 Your account was provisioned on day one. **Run this before anything else.** It is
 the difference between finding a problem now and finding it at 09:30 with the room ahead of
 you.
+
+**Prompt CoCo:**
+
+> Run this and show me any row that does not say PASS: EXECUTE IMMEDIATE FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/data-intelligence-app/generators/99_verify_setup.sql
+
+Or run it yourself:
 
 ```sql
 -- Every row must say PASS. Run this first, every session.
@@ -132,15 +132,9 @@ services, semantic view, interactive tables and the governance policies.
 Two things it deliberately does **not** build: the Cortex Agent and the evaluation set. Those
 are the session 5 exercises, and pre-building them would hand you the answers.
 
-Re-run the verification afterwards and confirm 20 PASS before continuing.
-
-```sql
--- Confirms yesterday's provisioning. Twenty assertions; every one must say PASS.
-EXECUTE IMMEDIATE FROM @FISERV_SETUP.PUBLIC.WORKSHOP/branches/main/labs/data-intelligence-app/generators/99_verify_setup.sql;
-```
-
-Every one of the twenty rows must say PASS. If any row fails, tell your facilitator now
-rather than debugging into the session.
+Re-run the verification from **Verify Your Account** above and confirm all 20 rows say PASS
+before continuing. If any row still fails, tell your facilitator now rather than debugging into
+the session.
 
 **If a prompt goes wrong at any point**, do not reach for a script. You have two moves.
 
