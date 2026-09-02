@@ -100,9 +100,27 @@ Without that instruction the agent reports the €3.2M of total fees as revenue 
 the €1.9M actually retained, an overstatement of about 66 percent. **The instructions are
 not decoration. They are the difference between a demo and a liability.**
 
-**Prompt CoCo:**
+### Test It in CoWork
 
-> Ask the agent what our net fee revenue was for the whole period.
+Everything so far has been in Snowsight. From here on you talk to the agent itself, which happens
+in **Snowflake CoWork**. That is also the only place you can see *which tool the agent chose and
+why*.
+
+Open it one of two ways:
+
+- Navigate to **`https://ai.snowflake.com`**, or
+- In Snowsight, go to **AI & ML > Agents**, select your agent, and choose **Preview in Snowflake CoWork**
+
+CoWork starts your session with your **default role and default warehouse**, not whatever you had
+selected in Snowsight. If the agent cannot reach anything, check those first with the pickers in
+the CoWork interface.
+
+Your agent should appear in the list automatically. Select it, then start by checking whether the
+instructions you just wrote actually landed.
+
+**Ask your agent:**
+
+> What was our net fee revenue for the whole period?
 
 ```sql
 -- The answer key. Derive it, do not assume it.
@@ -115,28 +133,14 @@ FROM FISERV_PAYMENTS_DB.RAW.FEE_LINES;
 Correct answer: **€1,934,149.64**. If you get €3,203,738.89, your instructions did not
 land. Go back and make them explicit.
 
-### Interrogate the Agent in CoWork
+### Test Agent Routing
 
-Everything so far has been in Snowsight. The rest of this section happens in **Snowflake CoWork**,
-which is where you talk to the agent you just built and, crucially, where you can see *which tool
-it chose and why*. That trace does not exist anywhere else.
-
-Open it one of two ways:
-
-- Navigate to **`https://ai.snowflake.com`**, or
-- In Snowsight, go to **AI & ML → Agents**, select your agent, and choose **Preview in Snowflake CoWork**
-
-CoWork starts your session with your **default role and default warehouse**, not whatever you had
-selected in Snowsight. If the agent cannot reach anything, check those first with the pickers in
-the CoWork interface.
-
-Your agent should appear in the list automatically. Select it, then work through the three
-questions below in order. They escalate deliberately: a simple lookup, a genuine multi-tool
-investigation, then a question the agent should refuse.
+Three more questions, still in CoWork, escalating deliberately: a simple lookup, a genuine
+multi-tool investigation, then a question the agent should refuse.
 
 **Ask your agent:**
 
-> Ask which month had the lowest approval rate and what it was.
+> Which month had the lowest approval rate and what was it?
 
 **August 2025 at 88.02 percent**, against roughly 93.98 to 93.99 percent in the other
 three months.

@@ -7,7 +7,7 @@
 <title>Fiserv SnowCamp &mdash; Day 2 Lab Guide</title>
 <script type="application/json" id="snowflake-report-metadata">
 {
-  "generated": "2026-09-01",
+  "generated": "2026-09-02",
   "intent": "Fiserv SnowCamp day 2 lab guide, mirroring the official CoCo end-to-end quickstart",
   "upstream": "https://www.snowflake.com/en/developers/guides/sfguide-build-end-to-end-ai-app-on-snowflake/",
   "sourceGuides": [
@@ -601,22 +601,24 @@ EXECUTE IMMEDIATE <span class="t-kw">FROM</span>
 <p><strong>Prompt CoCo:</strong></p>
 <div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p61" type="button">Copy</button></div><div class="prompt-body" id="p61">Now write the response instructions. This agent must not confuse total fees with net fee revenue, must use authorisation attempts as the denominator for approval rate, and must exclude declined transactions from processed volume. Be explicit, because these are the three mistakes it will otherwise make.</div></div>
 <p>Without that instruction the agent reports the €3.2M of total fees as revenue instead of the €1.9M actually retained, an overstatement of about 66 percent. <strong>The instructions are not decoration. They are the difference between a demo and a liability.</strong></p>
-<p><strong>Prompt CoCo:</strong></p>
-<div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p62" type="button">Copy</button></div><div class="prompt-body" id="p62">Ask the agent what our net fee revenue was for the whole period.</div></div>
+<h4 id="test-it-in-cowork">Test It in CoWork</h4>
+<p>Everything so far has been in Snowsight. From here on you talk to the agent itself, which happens in <strong>Snowflake CoWork</strong>. That is also the only place you can see *which tool the agent chose and why*.</p>
+<p>Open it one of two ways:</p>
+<ul><li>Navigate to <strong><code>https://ai.snowflake.com</code></strong>, or</li><li>In Snowsight, go to <strong>AI &amp; ML &gt; Agents</strong>, select your agent, and choose <strong>Preview in Snowflake CoWork</strong></li></ul>
+<p>CoWork starts your session with your <strong>default role and default warehouse</strong>, not whatever you had selected in Snowsight. If the agent cannot reach anything, check those first with the pickers in the CoWork interface.</p>
+<p>Your agent should appear in the list automatically. Select it, then start by checking whether the instructions you just wrote actually landed.</p>
+<p><strong>Ask your agent:</strong></p>
+<div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p62" type="button">Copy</button></div><div class="prompt-body" id="p62">What was our net fee revenue for the whole period?</div></div>
 <div class="code-card"><div class="code-head"><span class="code-lang">sql</span><button class="copy" data-copy="c63" type="button">Copy</button></div><pre id="c63"><code><span class="t-comment">-- The answer key. Derive it, do not assume it.</span>
 <span class="t-kw">SELECT</span> <span class="t-kw">ROUND</span>(<span class="t-kw">SUM</span>(<span class="t-kw">CASE</span> <span class="t-kw">WHEN</span> FEE_CATEGORY = <span class="t-string">&#x27;Pass-through&#x27;</span> <span class="t-kw">THEN</span> <span class="t-num">0</span>
                       <span class="t-kw">ELSE</span> FEE_AMOUNT_EUR <span class="t-kw">END</span>), <span class="t-num">2</span>) <span class="t-kw">AS</span> NET_FEE_REVENUE_EUR,
        <span class="t-kw">ROUND</span>(<span class="t-kw">SUM</span>(FEE_AMOUNT_EUR), <span class="t-num">2</span>)               <span class="t-kw">AS</span> TOTAL_FEES_EUR
 <span class="t-kw">FROM</span> FISERV_PAYMENTS_DB.RAW.FEE_LINES;</code></pre></div>
 <p>Correct answer: <strong>€1,934,149.64</strong>. If you get €3,203,738.89, your instructions did not land. Go back and make them explicit.</p>
-<h4 id="interrogate-the-agent-in-cowork">Interrogate the Agent in CoWork</h4>
-<p>Everything so far has been in Snowsight. The rest of this section happens in <strong>Snowflake CoWork</strong>, which is where you talk to the agent you just built and, crucially, where you can see *which tool it chose and why*. That trace does not exist anywhere else.</p>
-<p>Open it one of two ways:</p>
-<ul><li>Navigate to <strong><code>https://ai.snowflake.com</code></strong>, or</li><li>In Snowsight, go to <strong>AI &amp; ML → Agents</strong>, select your agent, and choose <strong>Preview in Snowflake CoWork</strong></li></ul>
-<p>CoWork starts your session with your <strong>default role and default warehouse</strong>, not whatever you had selected in Snowsight. If the agent cannot reach anything, check those first with the pickers in the CoWork interface.</p>
-<p>Your agent should appear in the list automatically. Select it, then work through the three questions below in order. They escalate deliberately: a simple lookup, a genuine multi-tool investigation, then a question the agent should refuse.</p>
+<h4 id="test-agent-routing">Test Agent Routing</h4>
+<p>Three more questions, still in CoWork, escalating deliberately: a simple lookup, a genuine multi-tool investigation, then a question the agent should refuse.</p>
 <p><strong>Ask your agent:</strong></p>
-<div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p64" type="button">Copy</button></div><div class="prompt-body" id="p64">Ask which month had the lowest approval rate and what it was.</div></div>
+<div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p64" type="button">Copy</button></div><div class="prompt-body" id="p64">Which month had the lowest approval rate and what was it?</div></div>
 <p><strong>August 2025 at 88.02 percent</strong>, against roughly 93.98 to 93.99 percent in the other three months.</p>
 <p>Now the capstone question:</p>
 <div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p65" type="button">Copy</button></div><div class="prompt-body" id="p65">Approval rates dipped in August. What happened, and does the merchant-facing evidence agree?</div></div>
