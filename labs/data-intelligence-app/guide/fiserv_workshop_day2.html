@@ -243,6 +243,18 @@ p.takeaway {
 ol.toc-body { margin: 12px 0; }
 ol.toc-body li { margin: 3px 0; }
 
+.toolswitch {
+  margin: 34px 0 22px; padding: 16px 18px;
+  border: 2px solid var(--sf-blue); border-radius: 10px;
+  background: light-dark(#f2fafe, #101d25);
+}
+.toolswitch .switchchip {
+  display: inline-block; background: var(--sf-blue); color: #05222e;
+  font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em;
+  padding: 3px 11px; border-radius: 20px;
+}
+.toolswitch h3 { margin: 8px 0 6px; }
+.toolswitch > :last-child { margin-bottom: 0; }
 .sessionbreak {
   margin: 56px 0; padding: clamp(20px, 4vw, 30px);
   border: 2px solid var(--sf-blue); border-radius: 12px;
@@ -448,7 +460,7 @@ EXECUTE IMMEDIATE <span class="t-kw">FROM</span>
 <p class="takeaway"><strong>What to take away:</strong> a monitor tells you about the column it is attached to and nothing else. Coverage is a decision, and yours was wrong. This is the most common data quality failure in production and it never shows up as an error.</p>
 <h2 class="section" id="dynamic-tables-pipeline"><span class="num">4</span>Dynamic Tables Pipeline</h2>
 <p><strong>Dynamic Tables</strong> are declarative data pipelines. You define the target state as a SQL query and Snowflake handles incremental refresh automatically. The <code>TARGET_LAG</code> parameter controls freshness: set a time-based lag such as <code>&#x27;1 minute&#x27;</code>, or use <code>DOWNSTREAM</code>.</p>
-<p><code>DOWNSTREAM</code> is worth reading carefully, because the name describes the *direction the schedule comes from*, not what triggers it. A <code>DOWNSTREAM</code> table has no schedule of its own; it refreshes when a table that <strong>depends on it</strong> needs fresh data, taking its timing from the shortest lag among its consumers. A <code>DOWNSTREAM</code> table with no consumers therefore never refreshes on its own, and Snowflake raises no warning about that.</p>
+<p><code>DOWNSTREAM</code> is worth reading carefully, because the name describes the <em>direction the schedule comes from</em>, not what triggers it. A <code>DOWNSTREAM</code> table has no schedule of its own; it refreshes when a table that <strong>depends on it</strong> needs fresh data, taking its timing from the shortest lag among its consumers. A <code>DOWNSTREAM</code> table with no consumers therefore never refreshes on its own, and Snowflake raises no warning about that.</p>
 <p>This pipeline sets an explicit one-minute lag on the tier 1 tables and <code>DOWNSTREAM</code> on everything below, which is why the tier 3 tables hold data from their initial build.</p>
 <p><strong>Prompt CoCo:</strong></p>
 <div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p27" type="button">Copy</button></div><div class="prompt-body" id="p27">Explain the Dynamic Table pipeline in FISERV_PAYMENTS_DB.DYNAMIC_TABLES. Draw the dependency graph, and tell me the target lag and refresh mode of each table.</div></div>
@@ -502,7 +514,7 @@ EXECUTE IMMEDIATE <span class="t-kw">FROM</span>
 <p>Gen2 warehouses bring <strong>Snowflake Optima</strong>, a set of optimisations that learn from your query patterns and apply themselves with no configuration, no clustering keys to define and no extra cost. There are three parts, and they do different jobs:</p>
 <div class="table-wrap"><table><thead><tr><th>Feature</th><th>What it does</th></tr></thead><tbody><tr><td><strong>Optima Indexing</strong></td><td>Spots repetitive point-lookup queries and builds hidden indexes to accelerate them. Built on the search optimization service.</td></tr><tr><td><strong>Optima Metadata</strong></td><td>Adds metadata for columns used inefficiently in filters, improving <strong>partition pruning</strong>.</td></tr><tr><td><strong>Optima Planning</strong></td><td>Learns better query plans by observing how queries actually execute.</td></tr></tbody></table></div>
 <p>So indexing accelerates lookups and metadata improves pruning. It is a common slip to credit pruning to indexing. All three are available on Gen2 standard and Adaptive warehouses, in every edition.</p>
-<p>Because Optima applies itself, the only way to know it fired is to look. Query Profile&#x27;s <strong>Statistics</strong> pane has a row labelled *Partitions pruned by Snowflake Optima*, the <strong>Query insights</strong> pane shows *Snowflake Optima used*, and both are queryable through the <code>QUERY_INSIGHTS</code> view. Measure the difference, then confirm the cause rather than assuming it.</p>
+<p>Because Optima applies itself, the only way to know it fired is to look. Query Profile&#x27;s <strong>Statistics</strong> pane has a row labelled <em>Partitions pruned by Snowflake Optima</em>, the <strong>Query insights</strong> pane shows <em>Snowflake Optima used</em>, and both are queryable through the <code>QUERY_INSIGHTS</code> view. Measure the difference, then confirm the cause rather than assuming it.</p>
 <p><strong>Prompt CoCo:</strong></p>
 <div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p40" type="button">Copy</button></div><div class="prompt-body" id="p40">Compare FISERV_WH and FISERV_GEN2_WH. What is different about them?</div></div>
 <div class="code-card"><div class="code-head"><span class="code-lang">sql</span><button class="copy" data-copy="c41" type="button">Copy</button></div><pre id="c41"><code><span class="t-comment">-- Compare the two warehouses. Look at the GENERATION property.</span>
@@ -601,11 +613,13 @@ EXECUTE IMMEDIATE <span class="t-kw">FROM</span>
 <p><strong>Prompt CoCo:</strong></p>
 <div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p61" type="button">Copy</button></div><div class="prompt-body" id="p61">Now write the response instructions. This agent must not confuse total fees with net fee revenue, must use authorisation attempts as the denominator for approval rate, and must exclude declined transactions from processed volume. Be explicit, because these are the three mistakes it will otherwise make.</div></div>
 <p>Without that instruction the agent reports the €3.2M of total fees as revenue instead of the €1.9M actually retained, an overstatement of about 66 percent. <strong>The instructions are not decoration. They are the difference between a demo and a liability.</strong></p>
+<div class="toolswitch"><span class="switchchip">Switch to CoWork</span>
 <h4 id="test-it-in-cowork">Test It in CoWork</h4>
-<p>Everything so far has been in Snowsight. From here on you talk to the agent itself, which happens in <strong>Snowflake CoWork</strong>. That is also the only place you can see *which tool the agent chose and why*.</p>
+<p>Everything so far has been in Snowsight. From here on you talk to the agent itself, which happens in <strong>Snowflake CoWork</strong>. That is also the only place you can see <em>which tool the agent chose and why</em>.</p>
 <p>Open it one of two ways:</p>
 <ul><li>Navigate to <strong><code>https://ai.snowflake.com</code></strong>, or</li><li>In Snowsight, go to <strong>AI &amp; ML &gt; Agents</strong>, select your agent, and choose <strong>Preview in Snowflake CoWork</strong></li></ul>
 <p>Your agent should appear in the list automatically. Select it, then start by checking whether the instructions you just wrote actually landed.</p>
+</div>
 <p><strong>Prompt CoWork:</strong></p>
 <div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoWork</span><button class="copy" data-copy="p62" type="button">Copy</button></div><div class="prompt-body" id="p62">What was our net fee revenue for the whole period?</div></div>
 <div class="code-card"><div class="code-head"><span class="code-lang">sql</span><button class="copy" data-copy="c63" type="button">Copy</button></div><pre id="c63"><code><span class="t-comment">-- The answer key. Derive it, do not assume it.</span>
@@ -621,7 +635,7 @@ EXECUTE IMMEDIATE <span class="t-kw">FROM</span>
 <p><strong>August 2025 at 88.02 percent</strong>, against roughly 93.98 to 93.99 percent in the other three months.</p>
 <p>Now the capstone question:</p>
 <div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoWork</span><button class="copy" data-copy="p65" type="button">Copy</button></div><div class="prompt-body" id="p65">Approval rates dipped in August. What happened, and does the merchant-facing evidence agree?</div></div>
-<p>Watch which tools it reaches for in the trace. You are looking for *which* tool fired and *why*, not just the answer. A good answer quantifies the dip from the semantic view, finds that <strong>Issuer Unavailable rose to 38.1 percent of declines from a baseline of 5.0 percent</strong>, and then corroborates it from support cases and merchant feedback written in August. The numbers and the narrative agree, and the cause turns out to be upstream of Fiserv: not a terminal fault and not the gateway.</p>
+<p>Watch which tools it reaches for in the trace. You are looking for <em>which</em> tool fired and <em>why</em>, not just the answer. A good answer quantifies the dip from the semantic view, finds that <strong>Issuer Unavailable rose to 38.1 percent of declines from a baseline of 5.0 percent</strong>, and then corroborates it from support cases and merchant feedback written in August. The numbers and the narrative agree, and the cause turns out to be upstream of Fiserv: not a terminal fault and not the gateway.</p>
 <p>Then ask something it should refuse:</p>
 <div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoWork</span><button class="copy" data-copy="p66" type="button">Copy</button></div><div class="prompt-body" id="p66">What will our approval rate be next March?</div></div>
 <p>The data ends September 2025. A good agent says so. A bad one extrapolates confidently.</p>
@@ -665,13 +679,13 @@ EXECUTE IMMEDIATE <span class="t-kw">FROM</span>
 <span class="t-kw">ORDER</span> <span class="t-kw">BY</span> MERCHANTS <span class="t-kw">DESC</span>;</code></pre></div>
 <p>Four regions and 2,000,000 merchants as <code>ACCOUNTADMIN</code>. <strong>699,882 and one region</strong> as the regional role.</p>
 <h4 id="verify-through-cowork">Verify Through CoWork</h4>
-<p><strong>Facilitator demo.</strong> Your facilitator will sign in as a second user holding <code>SOUTHERN_EUROPE_MANAGER</code> and ask the agent the same August question you asked earlier. Same agent, same question, different answer, because the policy applies to the SQL the agent *generates*, not only to SQL you write yourself.</p>
+<p><strong>Facilitator demo.</strong> Your facilitator will sign in as a second user holding <code>SOUTHERN_EUROPE_MANAGER</code> and ask the agent the same August question you asked earlier. Same agent, same question, different answer, because the policy applies to the SQL the agent <em>generates</em>, not only to SQL you write yourself.</p>
 <p><strong>Prompt CoCo:</strong></p>
 <div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p74" type="button">Copy</button></div><div class="prompt-body" id="p74">If the policy filters what the agent can see, what does that mean for evaluating the agent?</div></div>
 <p>This matters for the next step. Evaluations do not pass session attributes, so an agent whose results depend on them cannot be evaluated meaningfully. Ours keys on <code>CURRENT_ROLE()</code> and the evaluation runs as your role, which is why it works here. A policy built on session variables would quietly break it.</p>
 <h2 class="section" id="streamlit-dashboard"><span class="num">11</span>Streamlit Dashboard</h2>
 <p><strong>Streamlit in Snowflake</strong> lets you build and deploy interactive data applications directly within your Snowflake account, with no external infrastructure. Apps run securely inside Snowflake with native access to your data, governed by role-based access control.</p>
-<p>Exactly *whose* role governs them is the question this section ends on, and it is not the one most people expect.</p>
+<p>Exactly <em>whose</em> role governs them is the question this section ends on, and it is not the one most people expect.</p>
 <p><strong>Prompt CoCo:</strong></p>
 <div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p75" type="button">Copy</button></div><div class="prompt-body" id="p75">Build me a Streamlit app in this account with two tabs. First tab: a dashboard of processed volume and approval rate by month and region, from the semantic view. Second tab: a chat box that talks to FISERV_PAYMENTS_AGENT.</div></div>
 <div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p76" type="button">Copy</button></div><div class="prompt-body" id="p76">Make the August dip obvious on the dashboard without me having to hunt for it.</div></div>
@@ -689,7 +703,7 @@ EXECUTE IMMEDIATE <span class="t-kw">FROM</span>
 <p>The fix is <strong>Restricted Caller&#x27;s Rights</strong>, which makes the app execute with the caller&#x27;s role so policies evaluate against the person viewing. It is deliberately not the default.</p>
 <p class="takeaway"><strong>What to take away:</strong> governance defined once at the table did follow the pipeline and the agent, and it is genuinely worth having. But it stopped at the app boundary, and nothing warned you. &quot;The policy applies everywhere&quot; was a reasonable assumption that happened to be wrong, and the only way you found out was by checking a number.</p>
 <h2 class="section" id="agent-evaluation"><span class="num">12</span>Agent Evaluation</h2>
-<p><strong>Agent evaluation</strong> scores an agent&#x27;s answers against ground truth you supply, and reports per-metric results you can act on. The metric to understand before you start is <strong>tool selection accuracy</strong>: it divides by <code>max(expected, actual)</code>, so calling an *extra* tool is penalised exactly as hard as missing a required one.</p>
+<p><strong>Agent evaluation</strong> scores an agent&#x27;s answers against ground truth you supply, and reports per-metric results you can act on. The metric to understand before you start is <strong>tool selection accuracy</strong>: it divides by <code>max(expected, actual)</code>, so calling an <em>extra</em> tool is penalised exactly as hard as missing a required one.</p>
 <p>That matters because a red metric is a <strong>question, not a verdict</strong>. More often than not the answer key is wrong, not the agent. You are about to find two of yours are.</p>
 <p>One limitation to know: evaluations do not pass session attributes, so the row access policy from the previous section does not apply during a run. Evaluate as the owner, not as a regional role.</p>
 <p>The agent gives confident answers. That is not evidence that they are right.</p>
@@ -708,7 +722,7 @@ EXECUTE IMMEDIATE <span class="t-kw">FROM</span>
 <span class="t-kw">WHERE</span> a.AUTH_RESULT = <span class="t-string">&#x27;Approved&#x27;</span>
 <span class="t-kw">GROUP</span> <span class="t-kw">BY</span> m.MERCHANT_SEGMENT
 <span class="t-kw">ORDER</span> <span class="t-kw">BY</span> VOLUME_EUR_M <span class="t-kw">DESC</span>;</code></pre></div>
-<p>The largest segment is <strong>SMB at €216.5M</strong>, not Enterprise. Enterprise is the most *concentrated* per merchant, which is a different claim. An evaluation asserting the wrong one would have failed a correct agent.</p>
+<p>The largest segment is <strong>SMB at €216.5M</strong>, not Enterprise. Enterprise is the most <em>concentrated</em> per merchant, which is a different claim. An evaluation asserting the wrong one would have failed a correct agent.</p>
 <h4 id="run-via-snowsight-ui">Run via Snowsight UI</h4>
 <p>Go to <strong>AI &amp; ML → Agents</strong>, select <code>FISERV_PAYMENTS_AGENT</code>, open the <strong>Evaluations</strong> tab, and create a run with answer correctness, logical consistency and tool selection accuracy.</p>
 <p>Or run it with SQL:</p>
@@ -738,7 +752,7 @@ CALL EXECUTE_AI_EVALUATION(
 <div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p88" type="button">Copy</button></div><div class="prompt-body" id="p88">Improve the agent based on what the evaluation found, then re-run and compare the two runs.</div></div>
 <p class="takeaway"><strong>What to take away:</strong> an evaluation is a test suite for an agent, and like any test suite it can be wrong in ways that look like the code is wrong. A red metric is a question, not a verdict.</p>
 <h2 class="section" id="agent-observability"><span class="num">13</span>Agent Observability</h2>
-<p><strong>Agent observability</strong> records what an agent actually did: the tools it chose, the inputs it passed them, how long each step took, and how many tokens it burned. Where evaluation asks *was the answer right*, observability asks *how was it produced*. Traces are organised as thread, turn, trace and span, so you can open a single conversation and walk down into an individual tool call.</p>
+<p><strong>Agent observability</strong> records what an agent actually did: the tools it chose, the inputs it passed them, how long each step took, and how many tokens it burned. Where evaluation asks <em>was the answer right</em>, observability asks <em>how was it produced</em>. Traces are organised as thread, turn, trace and span, so you can open a single conversation and walk down into an individual tool call.</p>
 <p>Two things determine what you see. <strong>Evaluation runs do not populate it</strong> — only real conversations do. And depth is gated by the <code>READ UNREDACTED AI OBSERVABILITY EVENTS TABLE</code> account privilege: without it you get tool names, latency and token counts, but not tool inputs or conversation text.</p>
 <div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p89" type="button">Copy</button></div><div class="prompt-body" id="p89"><strong>Partly verified.</strong> The SQL below runs correctly, but it returned <strong>zero rows</strong> when
 tested, because the agent had only ever been evaluated. Evaluation traces go to a

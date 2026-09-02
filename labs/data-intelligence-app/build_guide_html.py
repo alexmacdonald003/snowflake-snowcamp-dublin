@@ -96,7 +96,7 @@ def highlight_sql(code):
 
 
 def render_inline(text):
-    """Inline markdown: bold, inline code, and nothing else the guides use."""
+    """Inline markdown: bold, italic, inline code, links. Nothing else the guides use."""
     # Protect inline code first so ** inside it is left alone.
     spans, holder = [], "\x00%d\x00"
     def stash(m):
@@ -106,6 +106,7 @@ def render_inline(text):
 
     text = html.escape(text)
     text = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", text)
+    text = re.sub(r"(?<!\*)\*([^*\n]+)\*(?!\*)", r"<em>\1</em>", text)
     text = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', text)
 
     for i, s in enumerate(spans):
@@ -209,6 +210,11 @@ def render_table(rows):
     return "".join(out)
 
 
+# Headings that mark a switch to a different tool, and the chip each one gets. Missing
+# this transition is the failure mode that sends agent questions to CoCo, which silently
+# does not work, so it gets a panel rather than another h3.
+SWITCH_SECTIONS = {"Test It in CoWork": "Switch to CoWork"}
+
 PROMPT_LEAD_RE = re.compile(r"^\*\*Prompt ([A-Za-z]+):?\*\*\s*$")
 
 
@@ -219,15 +225,29 @@ def render_blocks(blocks, code_ids):
     # objects while CoWork queries the agent, and sending a prompt to the wrong one simply
     # does not work. Defaults to CoCo, which is the majority case.
     prompt_tool = "CoCo"
+    in_switch = False
     for b in blocks:
         t = b["t"]
         if t == "p":
             m = PROMPT_LEAD_RE.match(b["text"].strip())
             if m:
                 prompt_tool = m.group(1)
+                # A prompt lead-in belongs with its prompt, so end the switch panel
+                # here rather than splitting the label from the block it introduces.
+                if in_switch:
+                    out.append("</div>")
+                    in_switch = False
         if t == "h":
             # h2 is the section title, emitted by the caller. Everything else inline.
             tag = "h%d" % min(b["level"] + 1, 6) if b["level"] >= 3 else "h3"
+            chip = SWITCH_SECTIONS.get(b["text"].strip())
+            if in_switch and not chip:
+                out.append("</div>")
+                in_switch = False
+            if chip:
+                out.append('<div class="toolswitch">'
+                           '<span class="switchchip">%s</span>' % html.escape(chip))
+                in_switch = True
             out.append('<%s id="%s">%s</%s>' % (tag, slugify(b["text"]), render_inline(b["text"]), tag))
         elif t == "p":
             cls = ""
@@ -243,6 +263,9 @@ def render_blocks(blocks, code_ids):
         elif t == "hr":
             out.append("<hr>")
         elif t == "quote":
+            if in_switch:
+                out.append("</div>")
+                in_switch = False
             if WARN_RE.match(b["text"]):
                 out.append('<div class="callout warn">%s</div>' % render_inline(b["text"]))
             else:
@@ -256,6 +279,9 @@ def render_blocks(blocks, code_ids):
                     % (pid, pid, render_inline(b["text"]))
                 )
         elif t == "code":
+            if in_switch:
+                out.append("</div>")
+                in_switch = False
             code_ids.append(None)
             cid = "c%d" % len(code_ids)
             out.append(
@@ -265,6 +291,8 @@ def render_blocks(blocks, code_ids):
                 '<pre id="%s"><code>%s</code></pre></div>'
                 % (html.escape(b["lang"]), cid, cid, highlight_sql(b["src"]))
             )
+    if in_switch:
+        out.append("</div>")
     return "\n".join(out)
 
 
@@ -448,6 +476,18 @@ p.takeaway {
 ol.toc-body { margin: 12px 0; }
 ol.toc-body li { margin: 3px 0; }
 
+.toolswitch {
+  margin: 34px 0 22px; padding: 16px 18px;
+  border: 2px solid var(--sf-blue); border-radius: 10px;
+  background: light-dark(#f2fafe, #101d25);
+}
+.toolswitch .switchchip {
+  display: inline-block; background: var(--sf-blue); color: #05222e;
+  font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em;
+  padding: 3px 11px; border-radius: 20px;
+}
+.toolswitch h3 { margin: 8px 0 6px; }
+.toolswitch > :last-child { margin-bottom: 0; }
 .sessionbreak {
   margin: 56px 0; padding: clamp(20px, 4vw, 30px);
   border: 2px solid var(--sf-blue); border-radius: 12px;
