@@ -209,10 +209,22 @@ def render_table(rows):
     return "".join(out)
 
 
+PROMPT_LEAD_RE = re.compile(r"^\*\*Prompt ([A-Za-z]+):?\*\*\s*$")
+
+
 def render_blocks(blocks, code_ids):
     out = []
+    # Blockquotes are prompts. Which assistant they belong to is declared by the bold
+    # lead-in above them ("**Prompt CoCo:**" / "**Prompt CoWork:**"), because CoCo builds
+    # objects while CoWork queries the agent, and sending a prompt to the wrong one simply
+    # does not work. Defaults to CoCo, which is the majority case.
+    prompt_tool = "CoCo"
     for b in blocks:
         t = b["t"]
+        if t == "p":
+            m = PROMPT_LEAD_RE.match(b["text"].strip())
+            if m:
+                prompt_tool = m.group(1)
         if t == "h":
             # h2 is the section title, emitted by the caller. Everything else inline.
             tag = "h%d" % min(b["level"] + 1, 6) if b["level"] >= 3 else "h3"
@@ -238,7 +250,7 @@ def render_blocks(blocks, code_ids):
                 pid = "p%d" % len(code_ids)
                 out.append(
                     '<div class="callout prompt">'
-                    '<div class="chip-row"><span class="chip">Prompt CoCo</span>'
+                    '<div class="chip-row"><span class="chip">Prompt %s</span>' % html.escape(prompt_tool) +
                     '<button class="copy" data-copy="%s" type="button">Copy</button></div>'
                     '<div class="prompt-body" id="%s">%s</div></div>'
                     % (pid, pid, render_inline(b["text"]))

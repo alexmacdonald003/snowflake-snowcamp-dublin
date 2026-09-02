@@ -607,8 +607,8 @@ EXECUTE IMMEDIATE <span class="t-kw">FROM</span>
 <ul><li>Navigate to <strong><code>https://ai.snowflake.com</code></strong>, or</li><li>In Snowsight, go to <strong>AI &amp; ML &gt; Agents</strong>, select your agent, and choose <strong>Preview in Snowflake CoWork</strong></li></ul>
 <p>CoWork starts your session with your <strong>default role and default warehouse</strong>, not whatever you had selected in Snowsight. If the agent cannot reach anything, check those first with the pickers in the CoWork interface.</p>
 <p>Your agent should appear in the list automatically. Select it, then start by checking whether the instructions you just wrote actually landed.</p>
-<p><strong>Ask your agent:</strong></p>
-<div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p62" type="button">Copy</button></div><div class="prompt-body" id="p62">What was our net fee revenue for the whole period?</div></div>
+<p><strong>Prompt CoWork:</strong></p>
+<div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoWork</span><button class="copy" data-copy="p62" type="button">Copy</button></div><div class="prompt-body" id="p62">What was our net fee revenue for the whole period?</div></div>
 <div class="code-card"><div class="code-head"><span class="code-lang">sql</span><button class="copy" data-copy="c63" type="button">Copy</button></div><pre id="c63"><code><span class="t-comment">-- The answer key. Derive it, do not assume it.</span>
 <span class="t-kw">SELECT</span> <span class="t-kw">ROUND</span>(<span class="t-kw">SUM</span>(<span class="t-kw">CASE</span> <span class="t-kw">WHEN</span> FEE_CATEGORY = <span class="t-string">&#x27;Pass-through&#x27;</span> <span class="t-kw">THEN</span> <span class="t-num">0</span>
                       <span class="t-kw">ELSE</span> FEE_AMOUNT_EUR <span class="t-kw">END</span>), <span class="t-num">2</span>) <span class="t-kw">AS</span> NET_FEE_REVENUE_EUR,
@@ -617,35 +617,38 @@ EXECUTE IMMEDIATE <span class="t-kw">FROM</span>
 <p>Correct answer: <strong>€1,934,149.64</strong>. If you get €3,203,738.89, your instructions did not land. Go back and make them explicit.</p>
 <h4 id="test-agent-routing">Test Agent Routing</h4>
 <p>Three more questions, still in CoWork, escalating deliberately: a simple lookup, a genuine multi-tool investigation, then a question the agent should refuse.</p>
-<p><strong>Ask your agent:</strong></p>
-<div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p64" type="button">Copy</button></div><div class="prompt-body" id="p64">Which month had the lowest approval rate and what was it?</div></div>
+<p><strong>Prompt CoWork:</strong></p>
+<div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoWork</span><button class="copy" data-copy="p64" type="button">Copy</button></div><div class="prompt-body" id="p64">Which month had the lowest approval rate and what was it?</div></div>
 <p><strong>August 2025 at 88.02 percent</strong>, against roughly 93.98 to 93.99 percent in the other three months.</p>
 <p>Now the capstone question:</p>
-<div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p65" type="button">Copy</button></div><div class="prompt-body" id="p65">Approval rates dipped in August. What happened, and does the merchant-facing evidence agree?</div></div>
+<div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoWork</span><button class="copy" data-copy="p65" type="button">Copy</button></div><div class="prompt-body" id="p65">Approval rates dipped in August. What happened, and does the merchant-facing evidence agree?</div></div>
 <p>Watch which tools it reaches for in the trace. You are looking for *which* tool fired and *why*, not just the answer. A good answer quantifies the dip from the semantic view, finds that <strong>Issuer Unavailable rose to 38.1 percent of declines from a baseline of 5.0 percent</strong>, and then corroborates it from support cases and merchant feedback written in August. The numbers and the narrative agree, and the cause turns out to be upstream of Fiserv: not a terminal fault and not the gateway.</p>
 <p>Then ask something it should refuse:</p>
-<div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p66" type="button">Copy</button></div><div class="prompt-body" id="p66">What will our approval rate be next March?</div></div>
+<div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoWork</span><button class="copy" data-copy="p66" type="button">Copy</button></div><div class="prompt-body" id="p66">What will our approval rate be next March?</div></div>
 <p>The data ends September 2025. A good agent says so. A bad one extrapolates confidently.</p>
 <h4 id="deep-research">Deep Research</h4>
 <div class="callout warn"><strong>Not yet verified.</strong> Deep Research is a CoWork interface feature with no SQL surface, so
 it could not be tested before the workshop. If it behaves differently from what follows,
 tell your facilitator: that is useful information, not a failure on your part.</div>
 <p><strong>Deep Research</strong> runs a multi-step investigation rather than answering in one shot. It plans, gathers from several sources, and returns a report with citations.</p>
-<p>Still in CoWork, select the <strong>+</strong> button in the message bar and choose <strong>Deep Research</strong>. Then ask:</p>
-<div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p67" type="button">Copy</button></div><div class="prompt-body" id="p67">Investigate the August 2025 approval rate dip end to end. Quantify it, identify the dominant decline reason and how far it moved from baseline, check whether merchant feedback and support cases from August corroborate it, and tell me whether the cause is inside or outside Fiserv&#x27;s control.</div></div>
+<p>Still in CoWork, select the <strong>+</strong> button in the message bar and choose <strong>Deep Research</strong>.</p>
+<p><strong>Prompt CoWork:</strong></p>
+<div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoWork</span><button class="copy" data-copy="p67" type="button">Copy</button></div><div class="prompt-body" id="p67">Investigate the August 2025 approval rate dip end to end. Quantify it, identify the dominant decline reason and how far it moved from baseline, check whether merchant feedback and support cases from August corroborate it, and tell me whether the cause is inside or outside Fiserv&#x27;s control.</div></div>
 <p><strong>Investigations can take up to 10 minutes.</strong> That is expected, not a hang. Start it, then read the next section while it runs rather than watching the spinner. Once the report is ready it stays in context for the rest of the thread, so follow-ups like &quot;break that down by region&quot; run as normal chat turns without restarting the investigation.</p>
 <p>Expect it to cite both the structured figures and specific pieces of free text. Compare its answer to the one you got from the single capstone question above: the interesting part is whether the extra steps changed the conclusion or only the amount of supporting evidence.</p>
 <h4 id="save-as-artifact">Save as Artifact</h4>
 <div class="callout warn"><strong>Not yet verified.</strong> As above.</div>
 <p>Save the Deep Research result as an <strong>Artifact</strong>, which makes it a governed object others can open rather than a message in your chat history.</p>
 <p>Then establish what governance travelled with it:</p>
-<div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p68" type="button">Copy</button></div><div class="prompt-body" id="p68">Who can see this artifact, and does the row access policy on RAW.MERCHANTS still apply to whoever opens it?</div></div>
+<p><strong>Prompt CoWork:</strong></p>
+<div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoWork</span><button class="copy" data-copy="p68" type="button">Copy</button></div><div class="prompt-body" id="p68">Who can see this artifact, and does the row access policy on RAW.MERCHANTS still apply to whoever opens it?</div></div>
 <p>That question matters more than the saving. An artifact that captured <code>ACCOUNTADMIN</code>-visible numbers and is then shared with a regional role would be a governance hole, and you want to know which way it works before you rely on it.</p>
 <h4 id="set-up-an-automation">Set Up an Automation</h4>
 <div class="callout warn"><strong>Not yet verified.</strong> As above.</div>
 <p>An <strong>Automation</strong> runs an agent request on a schedule, so an investigation becomes a recurring report.</p>
 <p>Create one that runs the approval-rate check weekly:</p>
-<div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoCo</span><button class="copy" data-copy="p69" type="button">Copy</button></div><div class="prompt-body" id="p69">Every Monday at 08:00, report processed volume, approval rate and net fee revenue for the previous week, and flag any decline reason that has moved more than five percentage points from its four-week average.</div></div>
+<p><strong>Prompt CoWork:</strong></p>
+<div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoWork</span><button class="copy" data-copy="p69" type="button">Copy</button></div><div class="prompt-body" id="p69">Every Monday at 08:00, report processed volume, approval rate and net fee revenue for the previous week, and flag any decline reason that has moved more than five percentage points from its four-week average.</div></div>
 <p>The flag threshold is the point. A scheduled report nobody reads is worse than no report; a scheduled report that only speaks up when something moved is a control.</p>
 <h2 class="section" id="security-and-governance"><span class="num">10</span>Security and Governance</h2>
 <p><strong>Row Access Policies</strong> enforce row-level security declaratively. You define a boolean expression that determines which rows are visible to which roles, and Snowflake applies it transparently to every query, including those generated by AI agents. No application code changes required.</p>

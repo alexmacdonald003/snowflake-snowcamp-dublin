@@ -118,7 +118,7 @@ the CoWork interface.
 Your agent should appear in the list automatically. Select it, then start by checking whether the
 instructions you just wrote actually landed.
 
-**Ask your agent:**
+**Prompt CoWork:**
 
 > What was our net fee revenue for the whole period?
 
@@ -138,7 +138,7 @@ land. Go back and make them explicit.
 Three more questions, still in CoWork, escalating deliberately: a simple lookup, a genuine
 multi-tool investigation, then a question the agent should refuse.
 
-**Ask your agent:**
+**Prompt CoWork:**
 
 > Which month had the lowest approval rate and what was it?
 
@@ -171,7 +171,9 @@ The data ends September 2025. A good agent says so. A bad one extrapolates confi
 **Deep Research** runs a multi-step investigation rather than answering in one shot. It
 plans, gathers from several sources, and returns a report with citations.
 
-Still in CoWork, select the **+** button in the message bar and choose **Deep Research**. Then ask:
+Still in CoWork, select the **+** button in the message bar and choose **Deep Research**.
+
+**Prompt CoWork:**
 
 > Investigate the August 2025 approval rate dip end to end. Quantify it, identify the dominant decline reason and how far it moved from baseline, check whether merchant feedback and support cases from August corroborate it, and tell me whether the cause is inside or outside Fiserv's control.
 
@@ -193,6 +195,8 @@ can open rather than a message in your chat history.
 
 Then establish what governance travelled with it:
 
+**Prompt CoWork:**
+
 > Who can see this artifact, and does the row access policy on RAW.MERCHANTS still apply to whoever opens it?
 
 That question matters more than the saving. An artifact that captured
@@ -207,6 +211,8 @@ An **Automation** runs an agent request on a schedule, so an investigation becom
 recurring report.
 
 Create one that runs the approval-rate check weekly:
+
+**Prompt CoWork:**
 
 > Every Monday at 08:00, report processed volume, approval rate and net fee revenue for the previous week, and flag any decline reason that has moved more than five percentage points from its four-week average.
 
