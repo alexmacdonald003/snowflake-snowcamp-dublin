@@ -160,10 +160,6 @@ The data ends September 2025. A good agent says so. A bad one extrapolates confi
 
 ### Deep Research
 
-> **Not yet verified.** Deep Research is a CoWork interface feature with no SQL surface, so
-> it could not be tested before the workshop. If it behaves differently from what follows,
-> tell your facilitator: that is useful information, not a failure on your part.
-
 **Deep Research** runs a multi-step investigation rather than answering in one shot. It
 plans, gathers from several sources, and returns a report with citations.
 
@@ -184,8 +180,6 @@ extra steps changed the conclusion or only the amount of supporting evidence.
 
 ### Save as Artifact
 
-> **Not yet verified.** As above.
-
 Save the Deep Research result as an **Artifact**, which makes it a governed object others
 can open rather than a message in your chat history.
 
@@ -200,8 +194,6 @@ That question matters more than the saving. An artifact that captured
 governance hole, and you want to know which way it works before you rely on it.
 
 ### Set Up an Automation
-
-> **Not yet verified.** As above.
 
 An **Automation** runs an agent request on a schedule, so an investigation becomes a
 recurring report.

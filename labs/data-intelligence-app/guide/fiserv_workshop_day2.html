@@ -626,9 +626,6 @@ EXECUTE IMMEDIATE <span class="t-kw">FROM</span>
 <div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoWork</span><button class="copy" data-copy="p66" type="button">Copy</button></div><div class="prompt-body" id="p66">What will our approval rate be next March?</div></div>
 <p>The data ends September 2025. A good agent says so. A bad one extrapolates confidently.</p>
 <h4 id="deep-research">Deep Research</h4>
-<div class="callout warn"><strong>Not yet verified.</strong> Deep Research is a CoWork interface feature with no SQL surface, so
-it could not be tested before the workshop. If it behaves differently from what follows,
-tell your facilitator: that is useful information, not a failure on your part.</div>
 <p><strong>Deep Research</strong> runs a multi-step investigation rather than answering in one shot. It plans, gathers from several sources, and returns a report with citations.</p>
 <p>Still in CoWork, select the <strong>+</strong> button in the message bar and choose <strong>Deep Research</strong>.</p>
 <p><strong>Prompt CoWork:</strong></p>
@@ -636,14 +633,12 @@ tell your facilitator: that is useful information, not a failure on your part.</
 <p><strong>Investigations can take up to 10 minutes.</strong> That is expected, not a hang. Start it, then read the next section while it runs rather than watching the spinner. Once the report is ready it stays in context for the rest of the thread, so follow-ups like &quot;break that down by region&quot; run as normal chat turns without restarting the investigation.</p>
 <p>Expect it to cite both the structured figures and specific pieces of free text. Compare its answer to the one you got from the single capstone question above: the interesting part is whether the extra steps changed the conclusion or only the amount of supporting evidence.</p>
 <h4 id="save-as-artifact">Save as Artifact</h4>
-<div class="callout warn"><strong>Not yet verified.</strong> As above.</div>
 <p>Save the Deep Research result as an <strong>Artifact</strong>, which makes it a governed object others can open rather than a message in your chat history.</p>
 <p>Then establish what governance travelled with it:</p>
 <p><strong>Prompt CoWork:</strong></p>
 <div class="callout prompt"><div class="chip-row"><span class="chip">Prompt CoWork</span><button class="copy" data-copy="p68" type="button">Copy</button></div><div class="prompt-body" id="p68">Who can see this artifact, and does the row access policy on RAW.MERCHANTS still apply to whoever opens it?</div></div>
 <p>That question matters more than the saving. An artifact that captured <code>ACCOUNTADMIN</code>-visible numbers and is then shared with a regional role would be a governance hole, and you want to know which way it works before you rely on it.</p>
 <h4 id="set-up-an-automation">Set Up an Automation</h4>
-<div class="callout warn"><strong>Not yet verified.</strong> As above.</div>
 <p>An <strong>Automation</strong> runs an agent request on a schedule, so an investigation becomes a recurring report.</p>
 <p>Create one that runs the approval-rate check weekly:</p>
 <p><strong>Prompt CoWork:</strong></p>
