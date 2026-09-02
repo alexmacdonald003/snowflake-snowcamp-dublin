@@ -111,10 +111,6 @@ Open it one of two ways:
 - Navigate to **`https://ai.snowflake.com`**, or
 - In Snowsight, go to **AI & ML > Agents**, select your agent, and choose **Preview in Snowflake CoWork**
 
-CoWork starts your session with your **default role and default warehouse**, not whatever you had
-selected in Snowsight. If the agent cannot reach anything, check those first with the pickers in
-the CoWork interface.
-
 Your agent should appear in the list automatically. Select it, then start by checking whether the
 instructions you just wrote actually landed.
 
