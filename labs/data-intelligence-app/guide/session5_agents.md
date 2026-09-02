@@ -114,6 +114,8 @@ Open it one of two ways:
 Your agent should appear in the list automatically. Select it, then start by checking whether the
 instructions you just wrote actually landed.
 
+---
+
 **Prompt CoWork:**
 
 > What was our net fee revenue for the whole period?
@@ -208,6 +210,14 @@ The flag threshold is the point. A scheduled report nobody reads is worse than n
 a scheduled report that only speaks up when something moved is a control.
 
 ## Security and Governance
+
+### Back to CoCo in Snowsight
+
+Leave CoWork here. The rest of this section is SQL and CoCo prompts back in **Snowsight**. You
+return to CoWork once at the end, to watch the policy you are about to write apply itself to the
+agent's own queries.
+
+---
 
 **Row Access Policies** enforce row-level security declaratively. You define a boolean
 expression that determines which rows are visible to which roles, and Snowflake applies it

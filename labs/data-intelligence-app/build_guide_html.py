@@ -213,7 +213,10 @@ def render_table(rows):
 # Headings that mark a switch to a different tool, and the chip each one gets. Missing
 # this transition is the failure mode that sends agent questions to CoCo, which silently
 # does not work, so it gets a panel rather than another h3.
-SWITCH_SECTIONS = {"Test It in CoWork": "Switch to CoWork"}
+SWITCH_SECTIONS = {
+    "Test It in CoWork": "Switch to CoWork",
+    "Back to CoCo in Snowsight": "Back to CoCo",
+}
 
 PROMPT_LEAD_RE = re.compile(r"^\*\*Prompt ([A-Za-z]+):?\*\*\s*$")
 
@@ -261,7 +264,12 @@ def render_blocks(blocks, code_ids):
         elif t == "table":
             out.append(render_table(b["rows"]))
         elif t == "hr":
-            out.append("<hr>")
+            if in_switch:
+                # Closes the switch panel rather than drawing a rule inside it.
+                out.append("</div>")
+                in_switch = False
+            else:
+                out.append("<hr>")
         elif t == "quote":
             if in_switch:
                 out.append("</div>")
